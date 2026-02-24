@@ -1,0 +1,14 @@
+{
+  "project_name": "GTO Teacher",
+  "tech_stack": {
+    "framework": "Next.js",
+    "language": "TypeScript",
+    "styling": "Tailwind CSS",
+    "ui_library": "shadcn/ui",
+    "deployment": "Vercel"
+  },
+  "workflow": {
+    "local_first": true,
+    "v0_lovable_compatibility": true
+  }
+}
