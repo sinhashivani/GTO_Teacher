@@ -1,15 +1,24 @@
 # Project State: GTO Teacher
 
-## Current Phase: Phase 1: Scaffolding & Core Engine
-- **Status**: Planning and Verification complete. Ready for execution.
-- **Goal**: Set up Next.js, Tailwind, shadcn/ui, and the core poker game loop.
+## Current Phase: Complete
+- **Status**: Phase 4 complete. Project ready for delivery.
+- **Goal**: Final polish and deployment.
 
 ## Recent Updates
-- Phase 1 plans created and verified (01-01, 01-02, 01-03).
-- Requirement IDs mapped and blockers resolved.
-- Visual theme and core engine logic fully planned.
+- **Phase 4 (Stats & Polish) Completed**:
+  - Built Session Stats dashboard (Hands, Profit, Win Rate, Accuracy).
+  - Implemented Hand History viewer for reviewing past hands.
+  - Enhanced Tavern theme with wood borders and radial gradients.
+  - Final visual polish and responsiveness verified.
+- **Phase 3 (Bot AI & Coaching Logic) Completed**:
+  - Bot AI and Recommendation Engine implemented.
 
 ## Next Steps
-1. Run `/gsd:execute-phase 1` to start execution.
-2. Initialize the Next.js repository with pixel-art theme.
-3. Build the core poker logic and state machine.
+1. Execute `04-01-PLAN.md` for the Stats Dashboard.
+2. Implement Hand History Viewer.
+3. Final polish and deployment.
+
+## Next Steps
+1. Execute `02-01-PLAN.md` to build the Tavern layout and table.
+2. Implement interactive controls and animations.
+3. Integrate Dexie.js for persistent data.

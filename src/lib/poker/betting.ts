@@ -11,8 +11,9 @@ export function handleAction(state: GameState, action: Action): GameState {
 
   switch (action.type) {
     case 'FOLD':
-      nextState.winner = opponent.id;
+      nextState.winnerId = opponent.id;
       nextState.stage = 'SHOWDOWN';
+      playerUpdate.isFolded = true;
       break;
 
     case 'CHECK':
@@ -57,8 +58,8 @@ export function handleAction(state: GameState, action: Action): GameState {
   nextState.players[opponentIndex] = opponentUpdate;
 
   // Check if round is over
-  const roundOver = nextState.players.every(p => p.hasActed) && 
-                    nextState.players[0].currentBet === nextState.players[1].currentBet;
+  const roundOver = nextState.players.every(p => p.hasActed || p.isFolded) && 
+                    (nextState.players[0].currentBet === nextState.players[1].currentBet || nextState.stage === 'SHOWDOWN');
 
   if (roundOver && nextState.stage !== 'SHOWDOWN') {
     // Return flag or handle transition outside

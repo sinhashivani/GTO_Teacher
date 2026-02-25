@@ -6,19 +6,19 @@ import { handleAction } from '../betting';
 describe('Poker Engine', () => {
   it('should play a full preflop round and transition to flop', () => {
     const game = new PokerGame(1000, 10, 20);
-    let state = game.initializeGame('player1', 'player2');
+    let state = game.initializeGame('player1', 'Alice', 'player2', 'Bob');
 
     assert.strictEqual(state.stage, 'PREFLOP');
     assert.strictEqual(state.pot, 30);
     assert.strictEqual(state.activePlayerIndex, 0); // SB
 
     // SB Calls
-    state = handleAction(state, { type: 'CALL' });
+    state = handleAction(state, { playerId: 'player1', type: 'CALL' });
     assert.strictEqual(state.activePlayerIndex, 1); // BB
     assert.strictEqual(state.pot, 40);
 
     // BB Checks
-    state = handleAction(state, { type: 'CHECK' });
+    state = handleAction(state, { playerId: 'player2', type: 'CHECK' });
     
     // -1 signals round end in our handleAction implementation
     assert.strictEqual(state.activePlayerIndex, -1);
@@ -32,11 +32,11 @@ describe('Poker Engine', () => {
 
   it('should end hand on FOLD', () => {
     const game = new PokerGame(1000, 10, 20);
-    let state = game.initializeGame('player1', 'player2');
+    let state = game.initializeGame('player1', 'Alice', 'player2', 'Bob');
 
     // SB Folds
-    state = handleAction(state, { type: 'FOLD' });
+    state = handleAction(state, { playerId: 'player1', type: 'FOLD' });
     assert.strictEqual(state.stage, 'SHOWDOWN');
-    assert.strictEqual(state.winner, 'player2');
+    assert.strictEqual(state.winnerId, 'player2');
   });
 });
