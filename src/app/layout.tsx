@@ -9,8 +9,8 @@ const pressStart2P = Press_Start_2P({
 });
 
 export const metadata: Metadata = {
-  title: "GTO Teacher",
-  description: "Learn GTO Poker the fun way",
+  title: "GTO Teacher - Learn Poker the RPG Way",
+  description: "Master Game Theory Optimal poker strategy in a pixel-art tavern. Challenge opponents, climb the ranks, and learn GTO fundamentals.",
 };
 
 export default function RootLayout({

@@ -1,5 +1,4 @@
 import React from "react";
-import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Card as CardType } from "@/lib/poker/types";
 import { CardView } from "./CardView";
@@ -10,9 +9,21 @@ interface PlayerSeatProps {
   isActive: boolean;
   position: "bottom" | "top" | "left" | "right";
   isDealer?: boolean;
+  isBigBlind?: boolean;
+  isSmallBlind?: boolean;
   holeCards?: CardType[];
   isCurrentPlayer?: boolean;
+  currentBet?: number;
+  isFolded?: boolean;
+  avatar?: string;
 }
+
+const positionMap = {
+  bottom: "bottom-0 left-1/2 -translate-x-1/2 translate-y-[60%]",
+  top: "top-0 left-1/2 -translate-x-1/2 -translate-y-[60%]",
+  left: "left-0 top-1/2 -translate-y-1/2 -translate-x-[60%]",
+  right: "right-0 top-1/2 -translate-y-1/2 translate-x-[60%]",
+};
 
 export const PlayerSeat: React.FC<PlayerSeatProps> = ({
   name,
@@ -20,50 +31,108 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
   isActive,
   position,
   isDealer,
+  isBigBlind,
+  isSmallBlind,
   holeCards,
   isCurrentPlayer,
+  currentBet,
+  isFolded,
+  avatar,
 }) => {
-  const positionClasses = {
-    bottom: "bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2",
-    top: "top-0 left-1/2 -translate-x-1/2 -translate-y-1/2",
-    left: "left-0 top-1/2 -translate-y-1/2 -translate-x-1/2",
-    right: "right-0 top-1/2 -translate-y-1/2 translate-x-1/2",
-  };
+  const isBottom = position === "bottom";
 
   return (
-    <div className={cn("absolute z-10", positionClasses[position])}>
-      <Card
-        className={cn(
-          "w-32 bg-tavern-dark border-2 border-tavern-gold rounded-none overflow-visible",
-          isActive && "ring-4 ring-white animate-pulse"
+    <div className={cn("absolute z-10", positionMap[position])}>
+      <div className="flex flex-col items-center gap-1.5">
+        {/* Cards above for bottom player, below for top player */}
+        {!isBottom && (
+          <div className="flex gap-1 justify-center mb-1">
+            {holeCards?.map((card, idx) => (
+              <CardView
+                key={idx}
+                card={card}
+                hidden={!isCurrentPlayer}
+                className="w-10 h-14"
+              />
+            )) || (
+              <>
+                <div className="w-10 h-14 bg-black/20 border border-dashed border-tavern-gold/10" />
+                <div className="w-10 h-14 bg-black/20 border border-dashed border-tavern-gold/10" />
+              </>
+            )}
+          </div>
         )}
-      >
-        <CardContent className="p-2 flex flex-col items-center gap-1 text-[10px]">
-          <span className="truncate w-full text-center uppercase text-white font-bold">{name}</span>
-          <span className="text-tavern-gold">SB {chips}</span>
-          
-          {isDealer && (
-            <div className="absolute -top-2 -right-2 w-6 h-6 bg-white border-2 border-black rounded-full flex items-center justify-center text-black font-bold">
-              D
-            </div>
+
+        {/* Seat card */}
+        <div
+          className={cn(
+            "relative flex flex-col items-center gap-1 px-3 py-2 bg-tavern-dark/90 border-2 min-w-[120px] transition-all duration-300",
+            isActive
+              ? "border-tavern-gold gold-glow"
+              : "border-tavern-wood/60",
+            isFolded && "opacity-40"
           )}
-        </CardContent>
-      </Card>
-      
-      {/* Cards Display */}
-      <div className="flex gap-1 justify-center mt-2">
-        {holeCards?.map((card, idx) => (
-          <CardView 
-            key={idx} 
-            card={card} 
-            hidden={!isCurrentPlayer} 
-            className="w-10 h-14"
-          />
-        )) || (
-          <>
-            <div className="w-10 h-14 bg-black/20 border-2 border-dashed border-white/10 rounded-sm" />
-            <div className="w-10 h-14 bg-black/20 border-2 border-dashed border-white/10 rounded-sm" />
-          </>
+          style={isActive ? { animation: "gold-pulse 2s ease-in-out infinite" } : {}}
+        >
+          {/* Avatar + Name row */}
+          <div className="flex items-center gap-2 w-full">
+            {avatar && (
+              <span className="text-sm">{avatar}</span>
+            )}
+            <span className="truncate text-[9px] uppercase tracking-wide text-tavern-parchment font-bold">
+              {name}
+            </span>
+          </div>
+
+          {/* Chips */}
+          <span className="text-[10px] text-tavern-gold">
+            {chips.toLocaleString()}
+          </span>
+
+          {/* Current bet indicator */}
+          {currentBet !== undefined && currentBet > 0 && (
+            <span className="text-[8px] text-tavern-gold/60">
+              {"Bet: "}{currentBet}
+            </span>
+          )}
+
+          {/* Position badges */}
+          <div className="absolute -top-2 -right-2 flex gap-0.5">
+            {isDealer && (
+              <div className="w-5 h-5 bg-tavern-parchment border border-tavern-dark flex items-center justify-center text-tavern-dark text-[8px] font-bold">
+                D
+              </div>
+            )}
+            {isSmallBlind && (
+              <div className="w-5 h-5 bg-tavern-wood border border-tavern-dark flex items-center justify-center text-tavern-gold text-[7px] font-bold">
+                SB
+              </div>
+            )}
+            {isBigBlind && (
+              <div className="w-5 h-5 bg-tavern-wood border border-tavern-dark flex items-center justify-center text-tavern-gold text-[7px] font-bold">
+                BB
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Cards below for bottom player */}
+        {isBottom && (
+          <div className="flex gap-1 justify-center mt-1">
+            {holeCards?.map((card, idx) => (
+              <CardView
+                key={idx}
+                card={card}
+                hidden={!isCurrentPlayer}
+                className="w-12 h-[68px]"
+              />
+            )) || (
+              <>
+                <div className="w-12 h-[68px] bg-black/20 border border-dashed border-tavern-gold/10" />
+                <div className="w-12 h-[68px] bg-black/20 border border-dashed border-tavern-gold/10" />
+              </>
+            )}
+          </div>
         )}
       </div>
     </div>
