@@ -1,5 +1,5 @@
-import { GameController } from "@/components/poker";
+import { TavernLobby } from "@/components/poker/TavernLobby";
 
 export default function Home() {
-  return <GameController />;
+  return <TavernLobby />;
 }

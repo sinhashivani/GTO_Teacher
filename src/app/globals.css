@@ -8,9 +8,14 @@
   --font-pixel: var(--font-press-start-2p), cursive;
   
   --color-tavern-gold: #D4AF37;
+  --color-tavern-gold-light: #F0D060;
   --color-tavern-green: #1B4D3E;
+  --color-tavern-green-felt: #1A6B47;
   --color-tavern-dark: #0D1B1E;
   --color-tavern-wood: #3D2B1F;
+  --color-tavern-wood-light: #5C3D2E;
+  --color-tavern-parchment: #E8D5A3;
+  --color-tavern-stone: #2A2A2E;
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -105,6 +110,125 @@
   .wood-border {
     position: relative;
     border: 8px solid #3D2B1F;
-    box-shadow: inset 0 0 20px rgba(0,0,0,0.5), 0 0 10px rgba(0,0,0,0.5);
+    box-shadow:
+      inset 0 0 20px rgba(0,0,0,0.5),
+      0 0 10px rgba(0,0,0,0.5),
+      inset 0 2px 0 #5C3D2E,
+      inset 0 -2px 0 #2A1A10;
   }
+
+  .wood-panel {
+    background: linear-gradient(180deg, #3D2B1F 0%, #2A1A10 100%);
+    border-top: 3px solid #5C3D2E;
+    border-bottom: 3px solid #1A0E08;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 -4px 16px rgba(0,0,0,0.5);
+  }
+
+  .rpg-frame {
+    position: relative;
+    border: 4px solid #5C3D2E;
+    background: linear-gradient(135deg, #E8D5A3 0%, #D4C090 100%);
+    box-shadow:
+      inset 0 0 8px rgba(0,0,0,0.2),
+      0 4px 12px rgba(0,0,0,0.4),
+      inset 2px 2px 0 #F0E0B8,
+      inset -2px -2px 0 #C4B080;
+  }
+
+  .rpg-frame::before {
+    content: "";
+    position: absolute;
+    inset: 2px;
+    border: 2px solid #3D2B1F;
+    pointer-events: none;
+  }
+
+  .tavern-stone-bg {
+    background-color: #2A2A2E;
+    background-image:
+      linear-gradient(45deg, rgba(255,255,255,0.02) 25%, transparent 25%),
+      linear-gradient(-45deg, rgba(255,255,255,0.02) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, rgba(0,0,0,0.04) 75%),
+      linear-gradient(-45deg, transparent 75%, rgba(0,0,0,0.04) 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+  }
+
+  .tavern-wood-bg {
+    background: linear-gradient(
+      90deg,
+      #3D2B1F 0%, #4A3525 8%, #3D2B1F 16%,
+      #4A3525 24%, #3D2B1F 32%, #4A3525 40%,
+      #3D2B1F 48%, #4A3525 56%, #3D2B1F 64%,
+      #4A3525 72%, #3D2B1F 80%, #4A3525 88%,
+      #3D2B1F 100%
+    );
+  }
+
+  .lantern-glow {
+    position: relative;
+  }
+
+  .lantern-glow::before {
+    content: "";
+    position: absolute;
+    top: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, rgba(212,175,55,0.08) 0%, transparent 70%);
+    pointer-events: none;
+    animation: lantern-flicker 4s ease-in-out infinite;
+    z-index: 0;
+  }
+
+  .felt-texture {
+    background-color: #1A6B47;
+    background-image:
+      radial-gradient(circle at 50% 50%, rgba(255,255,255,0.03) 0%, transparent 60%),
+      linear-gradient(0deg, rgba(0,0,0,0.15) 0%, transparent 40%, transparent 60%, rgba(0,0,0,0.15) 100%);
+  }
+
+  .gold-glow {
+    box-shadow:
+      0 0 8px rgba(212,175,55,0.3),
+      0 0 16px rgba(212,175,55,0.15),
+      inset 0 0 4px rgba(212,175,55,0.1);
+  }
+
+  .card-shadow {
+    box-shadow:
+      2px 2px 0 rgba(0,0,0,0.3),
+      4px 4px 8px rgba(0,0,0,0.2);
+  }
+
+  /* Scrollbar for drawer */
+  .tavern-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+  .tavern-scrollbar::-webkit-scrollbar-track {
+    background: #0D1B1E;
+  }
+  .tavern-scrollbar::-webkit-scrollbar-thumb {
+    background: #3D2B1F;
+    border: 1px solid #D4AF37;
+  }
+}
+
+@keyframes lantern-flicker {
+  0%, 100% { opacity: 0.6; transform: translateX(-50%) scale(1); }
+  25% { opacity: 0.8; transform: translateX(-50%) scale(1.05); }
+  50% { opacity: 0.5; transform: translateX(-50%) scale(0.95); }
+  75% { opacity: 0.9; transform: translateX(-50%) scale(1.02); }
+}
+
+@keyframes gold-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(212,175,55,0.3); }
+  50% { box-shadow: 0 0 16px rgba(212,175,55,0.5), 0 0 32px rgba(212,175,55,0.2); }
+}
+
+@keyframes float-up {
+  0% { transform: translateY(0); opacity: 1; }
+  100% { transform: translateY(-20px); opacity: 0; }
 }
