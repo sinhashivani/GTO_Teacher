@@ -7,7 +7,7 @@ interface PlayerSeatProps {
   name: string;
   chips: number;
   isActive: boolean;
-  position: "bottom" | "top" | "left" | "right";
+  position: "bottom" | "top" | "left" | "right" | "topLeft" | "topRight" | "bottomLeft" | "bottomRight";
   isDealer?: boolean;
   isBigBlind?: boolean;
   isSmallBlind?: boolean;
@@ -16,6 +16,7 @@ interface PlayerSeatProps {
   currentBet?: number;
   isFolded?: boolean;
   avatar?: string;
+  lastAction?: string;
 }
 
 const positionMap = {
@@ -23,6 +24,10 @@ const positionMap = {
   top: "top-0 left-1/2 -translate-x-1/2 -translate-y-[60%]",
   left: "left-0 top-1/2 -translate-y-1/2 -translate-x-[60%]",
   right: "right-0 top-1/2 -translate-y-1/2 translate-x-[60%]",
+  topLeft: "top-0 left-[20%] -translate-x-1/2 -translate-y-[60%]",
+  topRight: "top-0 left-[80%] -translate-x-1/2 -translate-y-[60%]",
+  bottomLeft: "bottom-0 left-[20%] -translate-x-1/2 translate-y-[60%]",
+  bottomRight: "bottom-0 left-[80%] -translate-x-1/2 translate-y-[60%]",
 };
 
 export const PlayerSeat: React.FC<PlayerSeatProps> = ({
@@ -38,6 +43,7 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
   currentBet,
   isFolded,
   avatar,
+  lastAction,
 }) => {
   const isBottom = position === "bottom";
 
@@ -74,6 +80,13 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
           )}
           style={isActive ? { animation: "gold-pulse 2s ease-in-out infinite" } : {}}
         >
+          {/* Last action badge */}
+          {lastAction && (
+            <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-tavern-gold text-tavern-dark text-[8px] font-bold uppercase border border-tavern-dark shadow-md z-20">
+              {lastAction}
+            </div>
+          )}
+
           {/* Avatar + Name row */}
           <div className="flex items-center gap-2 w-full">
             {avatar && (

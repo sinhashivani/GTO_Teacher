@@ -304,6 +304,7 @@ export const GameController: React.FC = () => {
                 currentBet={p.currentBet}
                 isFolded={p.isFolded}
                 avatar={p.id === "p1" ? undefined : opponentAvatar}
+                lastAction={gameState.lastAction?.playerId === p.id ? gameState.lastAction.type : undefined}
               />
             );
           })}
