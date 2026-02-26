@@ -157,6 +157,29 @@ export const GameController: React.FC = () => {
     [pokerEngine]
   );
 
+  useEffect(() => {
+    if (gameState?.activePlayerIndex === -1 && gameState?.stage !== "SHOWDOWN" && gameState?.stage !== "END") {
+      const timer = setTimeout(() => {
+        setGameState((current) => {
+          if (!current || current.activePlayerIndex !== -1 || current.stage === "SHOWDOWN" || current.stage === "END") return current;
+          
+          let nextState;
+          if (current.stage === "PREFLOP") {
+            nextState = pokerEngine.transitionToFlop(current);
+          } else if (current.stage === "FLOP") {
+            nextState = pokerEngine.transitionToTurn(current);
+          } else if (current.stage === "TURN") {
+            nextState = pokerEngine.transitionToRiver(current);
+          } else {
+            nextState = { ...current, stage: "SHOWDOWN" as const };
+          }
+          return nextState;
+        });
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [gameState, pokerEngine]);
+
   const onPlayerAction = async (type: ActionType, amount?: number) => {
     if (!gameState || isBotThinking) return;
 
