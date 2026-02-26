@@ -5,8 +5,10 @@ export interface UserSettings {
   id?: number;
   feedbackTiming: 'immediate' | 'delayed';
   showHandHistory: boolean;
-  difficulty: 'easy' | 'medium' | 'expert';
+  difficulty: 'easy' | 'medium' | 'expert' | 'mixed';
+  playerCount: number;
   playerName: string;
+  gameSpeed: 'normal' | 'fast';
 }
 
 export interface HandHistory {
@@ -15,7 +17,8 @@ export interface HandHistory {
   finalState: GameState;
   won: boolean;
   profit: number;
-  accuracyScore: number; // 100 for correct, 0 for incorrect (simplified for now)
+  accuracyScore: number;
+  reason?: string; // e.g., 'left game'
 }
 
 export class GTODatabase extends Dexie {
@@ -24,7 +27,7 @@ export class GTODatabase extends Dexie {
 
   constructor() {
     super('GTOTeacherDB');
-    this.version(2).stores({
+    this.version(4).stores({
       settings: '++id',
       hands: '++id, timestamp, won'
     });
@@ -41,7 +44,9 @@ export async function ensureSettings() {
       feedbackTiming: 'immediate',
       showHandHistory: true,
       difficulty: 'medium',
-      playerName: 'You'
+      playerCount: 2,
+      playerName: 'You',
+      gameSpeed: 'normal'
     });
   }
 }

@@ -7,7 +7,7 @@ import { motion } from "framer-motion";
 
 interface CharacterCardProps {
   name: string;
-  difficulty: "easy" | "medium" | "expert";
+  difficulty: "easy" | "medium" | "expert" | "mixed";
   description: string;
   buyIn: number;
   avatar: string;
@@ -34,6 +34,12 @@ const difficultyColors = {
     glow: "hover:shadow-[0_0_20px_rgba(239,68,68,0.3)]",
     badge: "bg-red-900 text-red-300",
     label: "Master",
+  },
+  mixed: {
+    border: "border-purple-600",
+    glow: "hover:shadow-[0_0_20px_rgba(147,51,234,0.3)]",
+    badge: "bg-purple-900 text-purple-300",
+    label: "Mixed",
   },
 };
 

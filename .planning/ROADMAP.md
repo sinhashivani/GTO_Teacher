@@ -52,8 +52,8 @@ Plans:
 
 **Goal:** Resolve asynchronous execution stalls and ensure UI synchronization during street transitions.
 **Depends on:** Phase 5
-**Plans:** 2 plans
+**Status:** COMPLETE
 
 Plans:
-- [ ] 06-01-PLAN.md — Async Street Transitions & Action Display [PH6-TRANSITION]
-- [ ] 06-02-PLAN.md — Turn Order & Bot AI Sync [PH6-ENGINE]
+- [x] 06-01-PLAN.md — Async Street Transitions & Action Display [PH6-TRANSITION]
+- [x] 06-02-PLAN.md — Turn Order & Bot AI Sync [PH6-ENGINE]

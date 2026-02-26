@@ -6,6 +6,7 @@ import { motion } from "framer-motion";
 import { TavernLayout } from "./TavernLayout";
 import { BankrollHeader } from "./BankrollHeader";
 import { CharacterCard } from "./CharacterCard";
+import { db, ensureSettings } from "@/lib/db";
 
 const OPPONENTS = [
   {
@@ -29,10 +30,29 @@ const OPPONENTS = [
     buyIn: 1000,
     avatar: "\u{1F6E1}",
   },
+  {
+    name: "The Tavern Regulars",
+    difficulty: "mixed" as const,
+    description: "A mixed table of various skills. Good for practice.",
+    buyIn: 500,
+    avatar: "\u{1F37B}",
+  },
 ];
 
 export const TavernLobby: React.FC = () => {
   const router = useRouter();
+
+  const handleSelect = async (difficulty: any) => {
+    await ensureSettings();
+    const settings = await db.settings.toCollection().first();
+    if (settings?.id) {
+      await db.settings.update(settings.id, { 
+        difficulty,
+        playerCount: difficulty === 'mixed' ? 6 : 2 // Default mixed to full table
+      });
+    }
+    router.push("/play");
+  };
 
   return (
     <TavernLayout mode="lobby">
@@ -75,7 +95,7 @@ export const TavernLobby: React.FC = () => {
             >
               <CharacterCard
                 {...opponent}
-                onClick={() => router.push(`/play?difficulty=${opponent.difficulty}`)}
+                onClick={() => handleSelect(opponent.difficulty)}
               />
             </motion.div>
           ))}

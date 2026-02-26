@@ -55,6 +55,7 @@ export const GameController: React.FC = () => {
   
   const difficulty = settings?.difficulty || "medium";
   const playerCount = settings?.playerCount || 2;
+  const gameSpeed = settings?.gameSpeed || "normal";
 
   const opponentName = OPPONENT_NAMES[difficulty === 'mixed' ? 'medium' : difficulty] || "The Cunning Rogue";
   const opponentAvatar = OPPONENT_AVATARS[difficulty === 'mixed' ? 'medium' : difficulty] || "\u{1F5E1}";
@@ -65,6 +66,23 @@ export const GameController: React.FC = () => {
   const { feedback, setFeedback, evaluateAction } = useCoaching();
 
   const currentHandAccuracies = useRef<number[]>([]);
+  
+  // Logical keys for turn and transition to prevent redundant triggers or stalls
+  const turnKey = useMemo(() => {
+    if (!gameState || gameState.activePlayerIndex === -1 || gameState.stage === "SHOWDOWN") return null;
+    const activePlayer = gameState.players[gameState.activePlayerIndex];
+    const isBot = activePlayer.id.startsWith("bot");
+    const isHeroAllIn = !isBot && activePlayer.stack === 0;
+    
+    if (!isBot && !isHeroAllIn) return null; // Player turn, handled by UI
+
+    return `${gameState.stage}-${gameState.activePlayerIndex}-${activePlayer.id}`;
+  }, [gameState]);
+
+  const transitionKey = useMemo(() => {
+    if (!gameState || gameState.activePlayerIndex !== -1 || gameState.stage === "SHOWDOWN" || gameState.stage === "END") return null;
+    return `${gameState.stage}-transition`;
+  }, [gameState]);
 
   // Live stats from Dexie
   const hands = useLiveQuery(() => db.hands.toArray());
@@ -158,27 +176,28 @@ export const GameController: React.FC = () => {
   );
 
   useEffect(() => {
-    if (gameState?.activePlayerIndex === -1 && gameState?.stage !== "SHOWDOWN" && gameState?.stage !== "END") {
-      const timer = setTimeout(() => {
-        setGameState((current) => {
-          if (!current || current.activePlayerIndex !== -1 || current.stage === "SHOWDOWN" || current.stage === "END") return current;
-          
-          let nextState;
-          if (current.stage === "PREFLOP") {
-            nextState = pokerEngine.transitionToFlop(current);
-          } else if (current.stage === "FLOP") {
-            nextState = pokerEngine.transitionToTurn(current);
-          } else if (current.stage === "TURN") {
-            nextState = pokerEngine.transitionToRiver(current);
-          } else {
-            nextState = { ...current, stage: "SHOWDOWN" as const };
-          }
-          return nextState;
-        });
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [gameState, pokerEngine]);
+    if (!transitionKey || !gameState) return;
+
+    const delay = gameSpeed === "fast" ? 800 : 2000;
+    const timer = setTimeout(() => {
+      setGameState((current) => {
+        if (!current || current.activePlayerIndex !== -1 || current.stage === "SHOWDOWN" || current.stage === "END") return current;
+        
+        let nextState;
+        if (current.stage === "PREFLOP") {
+          nextState = pokerEngine.transitionToFlop(current);
+        } else if (current.stage === "FLOP") {
+          nextState = pokerEngine.transitionToTurn(current);
+        } else if (current.stage === "TURN") {
+          nextState = pokerEngine.transitionToRiver(current);
+        } else {
+          nextState = { ...current, stage: "SHOWDOWN" as const };
+        }
+        return nextState;
+      });
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [transitionKey, pokerEngine, gameSpeed]);
 
   const onPlayerAction = async (type: ActionType, amount?: number) => {
     if (!gameState || isBotThinking) return;
@@ -202,36 +221,35 @@ export const GameController: React.FC = () => {
   };
 
   useEffect(() => {
-    if (gameState && gameState.activePlayerIndex !== -1 && gameState.stage !== "SHOWDOWN") {
-      const activePlayer = gameState.players[gameState.activePlayerIndex];
-      const isBot = activePlayer.id.startsWith("bot");
-      
-      // Handle Bot Turn
-      if (isBot && !isBotThinking) {
-        setIsBotThinking(true);
-        const timer = setTimeout(async () => {
-          try {
-            const s = await db.settings.toCollection().first();
-            const botAction = BotAI.getAction(gameState, s?.difficulty || "medium");
-            processAction(botAction);
-          } catch (e) {
-            console.error("Bot action error:", e);
-          } finally {
-            setIsBotThinking(false);
-          }
-        }, 1500);
-        return () => clearTimeout(timer);
-      }
-      
-      // Handle Hero All-in (Auto-check)
-      if (!isBot && activePlayer.stack === 0 && !isBotThinking) {
-        const timer = setTimeout(() => {
-          processAction({ playerId: activePlayer.id, type: "CHECK" });
-        }, 1000);
-        return () => clearTimeout(timer);
-      }
+    if (!turnKey || !gameState) return;
+
+    const activePlayer = gameState.players[gameState.activePlayerIndex];
+    const isBot = activePlayer.id.startsWith("bot");
+    
+    if (isBot) {
+      setIsBotThinking(true);
+      const delay = gameSpeed === "fast" ? 500 : 1500;
+      const timer = setTimeout(async () => {
+        try {
+          const s = await db.settings.toCollection().first();
+          const botAction = BotAI.getAction(gameState, s?.difficulty || "medium");
+          processAction(botAction);
+        } catch (e) {
+          console.error("Bot action error:", e);
+        } finally {
+          setIsBotThinking(false);
+        }
+      }, delay);
+      return () => clearTimeout(timer);
+    } else {
+      // Hero All-in (Auto-check)
+      const delay = gameSpeed === "fast" ? 400 : 1000;
+      const timer = setTimeout(() => {
+        processAction({ playerId: activePlayer.id, type: "CHECK" });
+      }, delay);
+      return () => clearTimeout(timer);
     }
-  }, [gameState, isBotThinking, processAction]);
+  }, [turnKey, processAction, gameSpeed]);
 
   if (!gameState)
     return (
@@ -247,9 +265,9 @@ export const GameController: React.FC = () => {
     gameState.players[gameState.activePlayerIndex].id === "p1" &&
     !isBotThinking;
 
-  const canCheck = player.currentBet === opponent.currentBet;
-  const callAmount = opponent.currentBet - player.currentBet;
-  const minRaise = Math.max(opponent.currentBet * 2, 40);
+  const canCheck = player.currentBet === Math.max(...gameState.players.map(p => p.currentBet));
+  const callAmount = Math.max(...gameState.players.map(p => p.currentBet)) - player.currentBet;
+  const minRaise = Math.max(Math.max(...gameState.players.map(p => p.currentBet)) * 2, 40);
   const maxRaise = player.stack + player.currentBet;
 
   // Hand strength label

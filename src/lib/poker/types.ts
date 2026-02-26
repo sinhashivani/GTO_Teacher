@@ -34,6 +34,11 @@ export interface Action {
   amount?: number;
 }
 
+export interface SidePot {
+  amount: number;
+  participants: number[]; // Player indices
+}
+
 export interface Player {
   id: string;
   name: string;
@@ -47,6 +52,7 @@ export interface Player {
 export interface GameState {
   stage: GameStage;
   pot: number;
+  sidePots?: SidePot[];
   communityCards: Card[];
   players: Player[];
   activePlayerIndex: number;
@@ -54,4 +60,5 @@ export interface GameState {
   lastRaiseAmount: number;
   lastAction?: Action;
   winnerId?: string;
+  winners?: string[]; // For split pots
 }

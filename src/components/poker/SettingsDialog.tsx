@@ -71,12 +71,12 @@ export const SettingsDialog: React.FC = () => {
             <label className="text-[9px] uppercase tracking-wider text-tavern-gold/60">
               Difficulty
             </label>
-            <div className="flex gap-2">
-              {(["easy", "medium", "expert"] as const).map((d) => (
+            <div className="flex gap-2 flex-wrap">
+              {(["easy", "medium", "expert", "mixed"] as const).map((d) => (
                 <Button
                   key={d}
                   className={cn(
-                    "flex-1 uppercase text-[8px] h-8 transition-colors",
+                    "flex-1 uppercase text-[8px] h-8 min-w-[70px] transition-colors",
                     settings.difficulty === d
                       ? "bg-tavern-gold text-tavern-dark"
                       : "bg-tavern-dark text-tavern-gold/50 border border-tavern-wood hover:bg-tavern-wood/30"
@@ -84,16 +84,79 @@ export const SettingsDialog: React.FC = () => {
                   onClick={() => updateSettings({ difficulty: d })}
                 >
                   {d}
+                  {settings.difficulty !== d && <span className="block text-[6px] normal-case">*</span>}
+                </Button>
+              ))}
+            </div>
+            <p className="text-[6px] text-tavern-gold/40">* Applies next hand</p>
+          </div>
+
+          {/* Player Count */}
+          <div className="flex flex-col gap-2">
+            <label className="text-[9px] uppercase tracking-wider text-tavern-gold/60">
+              Player Count
+            </label>
+            <div className="flex gap-2">
+              {([2, 3, 4, 5, 6] as const).map((n) => (
+                <Button
+                  key={n}
+                  className={cn(
+                    "flex-1 uppercase text-[8px] h-8 transition-colors",
+                    settings.playerCount === n
+                      ? "bg-tavern-gold text-tavern-dark"
+                      : "bg-tavern-dark text-tavern-gold/50 border border-tavern-wood hover:bg-tavern-wood/30"
+                  )}
+                  onClick={() => updateSettings({ playerCount: n })}
+                >
+                  {n}
+                  {settings.playerCount !== n && <span className="block text-[6px] normal-case">*</span>}
                 </Button>
               ))}
             </div>
           </div>
 
-          {/* Reset */}
-          <div className="pt-2 border-t border-tavern-wood/30">
+          {/* Game Speed */}
+          <div className="flex flex-col gap-2">
+            <label className="text-[9px] uppercase tracking-wider text-tavern-gold/60">
+              Game Speed
+            </label>
+            <div className="flex gap-2">
+              {(["normal", "fast"] as const).map((speed) => (
+                <Button
+                  key={speed}
+                  className={cn(
+                    "flex-1 uppercase text-[8px] h-8 transition-colors",
+                    settings.gameSpeed === speed
+                      ? "bg-tavern-gold text-tavern-dark"
+                      : "bg-tavern-dark text-tavern-gold/50 border border-tavern-wood hover:bg-tavern-wood/30"
+                  )}
+                  onClick={() => updateSettings({ gameSpeed: speed })}
+                >
+                  {speed}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* Leave Game */}
+          <div className="pt-2 border-t border-tavern-wood/30 flex flex-col gap-2">
+            <Button
+              className="w-full bg-tavern-wood/60 text-tavern-gold hover:bg-tavern-wood border border-tavern-wood/40 uppercase text-[8px] h-8"
+              onClick={() => {
+                if (window.confirm("Leave current hand? This will forfeit the hand.")) {
+                  window.dispatchEvent(new CustomEvent('leave-game'));
+                }
+              }}
+            >
+              Leave Game
+            </Button>
             <Button
               className="w-full bg-red-900/60 text-red-300 hover:bg-red-900 border border-red-800/40 uppercase text-[8px] h-8"
-              onClick={() => db.hands.clear()}
+              onClick={() => {
+                if (window.confirm("Clear all session stats?")) {
+                  db.hands.clear();
+                }
+              }}
             >
               Reset Session Stats
             </Button>

@@ -56,12 +56,24 @@ export class PokerGame {
       };
     });
 
+    // Ensure the first actor actually has chips
+    let finalFirstActor = firstActorIndex;
+    if (players[finalFirstActor].stack === 0) {
+      for (let i = 1; i <= numPlayers; i++) {
+        const nextIndex = (firstActorIndex + i) % numPlayers;
+        if (!players[nextIndex].isFolded && players[nextIndex].stack > 0) {
+          finalFirstActor = nextIndex;
+          break;
+        }
+      }
+    }
+
     return {
       stage: 'PREFLOP',
       pot: players.reduce((sum, p) => sum + p.currentBet, 0),
       communityCards: [],
       players,
-      activePlayerIndex: firstActorIndex,
+      activePlayerIndex: finalFirstActor,
       dealerIndex,
       lastRaiseAmount: this.bigBlind,
     };
@@ -94,17 +106,20 @@ export class PokerGame {
 
   private getPostFlopFirstActor(dealerIndex: number, players: Player[]): number {
     const numPlayers = players.length;
+    
+    // Betting can only happen if at least 2 players have chips
+    const playersWithChips = players.filter(p => !p.isFolded && p.stack > 0);
+    if (playersWithChips.length <= 1) {
+      return -1;
+    }
+
     for (let i = 1; i <= numPlayers; i++) {
       const nextIndex = (dealerIndex + i) % numPlayers;
       if (!players[nextIndex].isFolded && players[nextIndex].stack > 0) {
         return nextIndex;
       }
     }
-    // If only one player left with chips, they technically don't have to act, but we need an index
-    for (let i = 1; i <= numPlayers; i++) {
-      const nextIndex = (dealerIndex + i) % numPlayers;
-      if (!players[nextIndex].isFolded) return nextIndex;
-    }
+    
     return -1;
   }
 
