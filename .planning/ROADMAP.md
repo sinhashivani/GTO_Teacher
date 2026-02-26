@@ -38,6 +38,22 @@ Plans:
 - [x] 04-03-PLAN.md — Final visual polish and responsiveness. [PH4-POLISH]
 
 ## Phase 5: Expansion (Future)
-- [ ] Add Turn and River stages.
-- [ ] Implement advanced GTO solver integration (WASM).
-- [ ] Multi-street range analysis.
+**Goal:** Expand to 2-6 seats, Turn/River streets, and enhanced bot/coaching logic.
+**Status:** COMPLETE
+
+Plans:
+- [x] 05-01-PLAN.md — Engine & Types expansion (Multiplayer, Side Pots). [PH5-ENGINE]
+- [x] 05-02-PLAN.md — Bot AI & Coaching scaling. [PH5-BOTS]
+- [x] 05-03-PLAN.md — UI Updates & Debug Panel. [PH5-UI]
+- [x] 05-04-PLAN.md — Persistence & Leave Game logic. [PH5-PERSISTENCE]
+- [x] 05-05-PLAN.md — Final Verification & UAT. [PH5-VERIFY]
+
+### Phase 6: Fix engine synchronization and UI stalls
+
+**Goal:** Resolve asynchronous execution stalls and ensure UI synchronization during street transitions.
+**Depends on:** Phase 5
+**Plans:** 2 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — Async Street Transitions & Action Display [PH6-TRANSITION]
+- [ ] 06-02-PLAN.md — Turn Order & Bot AI Sync [PH6-ENGINE]
