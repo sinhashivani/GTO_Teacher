@@ -9,6 +9,10 @@ export interface UserSettings {
   playerCount: number;
   playerName: string;
   gameSpeed: 'normal' | 'fast';
+  showHandGuide: boolean;
+  creditMode: boolean;
+  creditLimit: number;
+  startingStack: number;
 }
 
 export interface HandHistory {
@@ -27,7 +31,7 @@ export class GTODatabase extends Dexie {
 
   constructor() {
     super('GTOTeacherDB');
-    this.version(4).stores({
+    this.version(6).stores({
       settings: '++id',
       hands: '++id, timestamp, won'
     });
@@ -46,7 +50,11 @@ export async function ensureSettings() {
       difficulty: 'medium',
       playerCount: 2,
       playerName: 'You',
-      gameSpeed: 'normal'
+      gameSpeed: 'normal',
+      showHandGuide: false,
+      creditMode: false,
+      creditLimit: -2000,
+      startingStack: 1000
     });
   }
 }
