@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { PokerGame } from "@/lib/poker/state-machine";
 import { handleAction } from "@/lib/poker/betting";
 import { GameState, ActionType, Action } from "@/lib/poker/types";
@@ -18,6 +18,7 @@ import { AdviceCard } from "./AdviceCard";
 import { BankrollHeader } from "./BankrollHeader";
 import { RightDrawerPanel } from "./RightDrawerPanel";
 import { SettingsDialog } from "./SettingsDialog";
+import { DebugPanel } from "./DebugPanel";
 import { useLiveQuery } from "dexie-react-hooks";
 
 const OPPONENT_NAMES: Record<string, string> = {
@@ -32,13 +33,31 @@ const OPPONENT_AVATARS: Record<string, string> = {
   expert: "\u{1F6E1}",
 };
 
-export const GameController: React.FC = () => {
-  const searchParams = useSearchParams();
-  const difficultyParam = searchParams.get("difficulty") || "medium";
-  const difficulty = (["easy", "medium", "expert"].includes(difficultyParam) ? difficultyParam : "medium") as BotDifficulty;
+function getSeatPosition(index: number, totalPlayers: number): any {
+  if (totalPlayers === 2) {
+    return index === 0 ? "bottom" : "top";
+  }
 
-  const opponentName = OPPONENT_NAMES[difficulty] || "The Cunning Rogue";
-  const opponentAvatar = OPPONENT_AVATARS[difficulty] || "\u{1F5E1}";
+  const positions: Record<number, string[]> = {
+    3: ["bottom", "topLeft", "topRight"],
+    4: ["bottom", "left", "top", "right"],
+    5: ["bottom", "left", "topLeft", "topRight", "right"],
+    6: ["bottom", "bottomLeft", "topLeft", "top", "topRight", "bottomRight"],
+  };
+
+  return (positions[totalPlayers] || positions[2])[index] || "bottom";
+}
+
+export const GameController: React.FC = () => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const settings = useLiveQuery(() => db.settings.toCollection().first());
+  
+  const difficulty = settings?.difficulty || "medium";
+  const playerCount = settings?.playerCount || 2;
+
+  const opponentName = OPPONENT_NAMES[difficulty === 'mixed' ? 'medium' : difficulty] || "The Cunning Rogue";
+  const opponentAvatar = OPPONENT_AVATARS[difficulty === 'mixed' ? 'medium' : difficulty] || "\u{1F5E1}";
 
   const pokerEngine = useMemo(() => new PokerGame(), []);
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -56,14 +75,52 @@ export const GameController: React.FC = () => {
     ? Math.round((hands?.reduce((sum, h) => sum + h.accuracyScore, 0) || 0) / totalHands)
     : 0;
 
+  const startHand = useCallback((currentSettings: any) => {
+    const players = [{ id: "p1", name: "You" }];
+    const count = currentSettings?.playerCount || 2;
+    const diff = currentSettings?.difficulty || "medium";
+
+    for (let i = 1; i < count; i++) {
+      const botDiff = diff === 'mixed' ? (['easy', 'medium', 'expert'][i % 3]) : diff;
+      players.push({
+        id: `bot-${i}`,
+        name: `${OPPONENT_NAMES[botDiff as BotDifficulty]} #${i}`
+      });
+    }
+
+    const initialState = pokerEngine.initializeGame(players);
+    setGameState(initialState);
+    currentHandAccuracies.current = [];
+  }, [pokerEngine]);
+
   useEffect(() => {
     async function init() {
       await ensureSettings();
-      const initialState = pokerEngine.initializeGame("p1", "You", "bot", opponentName);
-      setGameState(initialState);
+      const s = await db.settings.toCollection().first();
+      startHand(s);
     }
     init();
-  }, [pokerEngine, opponentName]);
+  }, [pokerEngine, startHand]);
+
+  useEffect(() => {
+    const handleLeave = async () => {
+      if (gameState && gameState.stage !== "END" && gameState.stage !== "SHOWDOWN") {
+        const player = gameState.players.find((p) => p.id === "p1")!;
+        await db.hands.add({
+          timestamp: Date.now(),
+          finalState: gameState,
+          won: false,
+          profit: player.stack - 1000,
+          accuracyScore: 0,
+          reason: "left game",
+        });
+      }
+      router.push("/");
+    };
+
+    window.addEventListener('leave-game', handleLeave);
+    return () => window.removeEventListener('leave-game', handleLeave);
+  }, [gameState, router]);
 
   const processAction = useCallback(
     async (action: Action) => {
@@ -72,28 +129,24 @@ export const GameController: React.FC = () => {
         try {
           let newState = handleAction(current, action);
 
-          if (newState.activePlayerIndex === -1) {
-            if (newState.stage === "PREFLOP") {
-              newState = pokerEngine.transitionToFlop(newState);
-            } else {
-              newState.stage = "SHOWDOWN";
-              const player = newState.players.find((p) => p.id === "p1")!;
-              const avgAcc =
-                currentHandAccuracies.current.length > 0
-                  ? currentHandAccuracies.current.reduce((a, b) => a + b, 0) /
-                    currentHandAccuracies.current.length
-                  : 100;
+          if (newState.stage === "SHOWDOWN" && current.stage !== "SHOWDOWN") {
+            const player = newState.players.find((p) => p.id === "p1")!;
+            const avgAcc =
+              currentHandAccuracies.current.length > 0
+                ? currentHandAccuracies.current.reduce((a, b) => a + b, 0) /
+                  currentHandAccuracies.current.length
+                : 100;
 
-              db.hands.add({
-                timestamp: Date.now(),
-                finalState: newState,
-                won: newState.winnerId === "p1",
-                profit: player.stack - 1000,
-                accuracyScore: avgAcc,
-              });
-              currentHandAccuracies.current = [];
-            }
+            db.hands.add({
+              timestamp: Date.now(),
+              finalState: newState,
+              won: newState.winnerId === "p1",
+              profit: player.stack - 1000,
+              accuracyScore: avgAcc,
+            });
+            currentHandAccuracies.current = [];
           }
+          
           return newState;
         } catch (e) {
           console.error("Action error:", e);
@@ -113,12 +166,12 @@ export const GameController: React.FC = () => {
       amount: type === "RAISE" ? amount : undefined,
     };
 
-    const settings = await db.settings.toCollection().first();
+    const s = await db.settings.toCollection().first();
     const recommendation = BotAI.getAction(gameState, "expert");
     const isCorrect = action.type === recommendation.type;
     currentHandAccuracies.current.push(isCorrect ? 100 : 0);
 
-    if (settings?.feedbackTiming === "immediate") {
+    if (s?.feedbackTiming === "immediate") {
       evaluateAction(gameState, action);
     }
 
@@ -126,19 +179,36 @@ export const GameController: React.FC = () => {
   };
 
   useEffect(() => {
-    if (gameState && gameState.activePlayerIndex !== -1) {
+    if (gameState && gameState.activePlayerIndex !== -1 && gameState.stage !== "SHOWDOWN") {
       const activePlayer = gameState.players[gameState.activePlayerIndex];
-      if (activePlayer.id === "bot" && !isBotThinking && gameState.stage !== "SHOWDOWN") {
+      const isBot = activePlayer.id.startsWith("bot");
+      
+      // Handle Bot Turn
+      if (isBot && !isBotThinking) {
         setIsBotThinking(true);
         const timer = setTimeout(async () => {
-          const botAction = BotAI.getAction(gameState, difficulty);
-          processAction(botAction);
-          setIsBotThinking(false);
+          try {
+            const s = await db.settings.toCollection().first();
+            const botAction = BotAI.getAction(gameState, s?.difficulty || "medium");
+            processAction(botAction);
+          } catch (e) {
+            console.error("Bot action error:", e);
+          } finally {
+            setIsBotThinking(false);
+          }
         }, 1500);
         return () => clearTimeout(timer);
       }
+      
+      // Handle Hero All-in (Auto-check)
+      if (!isBot && activePlayer.stack === 0 && !isBotThinking) {
+        const timer = setTimeout(() => {
+          processAction({ playerId: activePlayer.id, type: "CHECK" });
+        }, 1000);
+        return () => clearTimeout(timer);
+      }
     }
-  }, [gameState, isBotThinking, processAction, difficulty]);
+  }, [gameState, isBotThinking, processAction]);
 
   if (!gameState)
     return (
@@ -170,6 +240,8 @@ export const GameController: React.FC = () => {
         <SettingsDialog />
       </div>
 
+      <DebugPanel gameState={gameState} />
+
       {/* Advice card */}
       {feedback && (
         <AdviceCard
@@ -194,32 +266,24 @@ export const GameController: React.FC = () => {
         <PokerTable pot={gameState.pot}>
           <CommunityCards cards={gameState.communityCards} />
 
-          <PlayerSeat
-            name={opponentName}
-            chips={opponent.stack}
-            isActive={
-              gameState.activePlayerIndex !== -1 &&
-              gameState.players[gameState.activePlayerIndex].id === opponent.id
-            }
-            position="top"
-            holeCards={opponent.holeCards}
-            isCurrentPlayer={gameState.stage === "SHOWDOWN"}
-            currentBet={opponent.currentBet}
-            isFolded={opponent.isFolded}
-            avatar={opponentAvatar}
-          />
-
-          <PlayerSeat
-            name={player.name}
-            chips={player.stack}
-            isActive={isPlayerTurn}
-            position="bottom"
-            isDealer={gameState.dealerIndex === 0}
-            holeCards={player.holeCards}
-            isCurrentPlayer={true}
-            currentBet={player.currentBet}
-            isFolded={player.isFolded}
-          />
+          {gameState.players.map((p, idx) => {
+            const position = getSeatPosition(idx, gameState.players.length);
+            return (
+              <PlayerSeat
+                key={p.id}
+                name={p.id === "p1" ? "You" : p.name}
+                chips={p.stack}
+                isActive={gameState.activePlayerIndex === idx}
+                position={position}
+                isDealer={gameState.dealerIndex === idx}
+                holeCards={p.holeCards}
+                isCurrentPlayer={p.id === "p1" || gameState.stage === "SHOWDOWN"}
+                currentBet={p.currentBet}
+                isFolded={p.isFolded}
+                avatar={p.id === "p1" ? undefined : opponentAvatar}
+              />
+            );
+          })}
         </PokerTable>
       </div>
 
@@ -239,8 +303,7 @@ export const GameController: React.FC = () => {
         isShowdown={gameState.stage === "SHOWDOWN"}
         showdownWon={gameState.winnerId === "p1"}
         onNextHand={() => {
-          setGameState(pokerEngine.initializeGame("p1", "You", "bot", opponentName));
-          currentHandAccuracies.current = [];
+          db.settings.toCollection().first().then(s => startHand(s));
         }}
       />
     </TavernLayout>
