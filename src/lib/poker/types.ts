@@ -19,9 +19,12 @@ export type HandCategory =
   | 'Royal Flush';
 
 export interface HandResult {
-  score: number;
-  category: HandCategory;
-  name: string;
+  handClass: HandCategory;
+  classRank: number;
+  best5: Card[];
+  tiebreak: number[];
+  handValue: number[]; // comparable tuple: [classRank, ...tiebreak]
+  description: string;
 }
 
 export type GameStage = 'PREFLOP' | 'FLOP' | 'TURN' | 'RIVER' | 'SHOWDOWN' | 'END';
@@ -32,6 +35,18 @@ export interface Action {
   playerId: string;
   type: ActionType;
   amount?: number;
+  scores?: Partial<Record<ActionType, number>>;
+  deviation?: {
+    recommended: ActionType;
+    rationale: string;
+  };
+  coaching?: {
+    recommended: ActionType;
+    why: string;
+    whatChanges?: string;
+    confidence: 'baseline' | 'heuristic' | 'lookup';
+    alternatives: { type: ActionType; reason: string }[];
+  };
 }
 
 export interface SidePot {
@@ -39,14 +54,19 @@ export interface SidePot {
   participants: number[]; // Player indices
 }
 
+export type Position = 'BTN' | 'SB' | 'BB' | 'UTG' | 'HJ' | 'CO';
+
 export interface Player {
   id: string;
   name: string;
   stack: number;
   holeCards: Card[];
   currentBet: number;
+  totalBet: number; // Total chips contributed to the pot in this hand
   hasActed: boolean;
   isFolded: boolean;
+  position?: Position;
+  difficulty?: string; // For bot quit logic
 }
 
 export interface GameState {
@@ -61,4 +81,5 @@ export interface GameState {
   lastAction?: Action;
   winnerId?: string;
   winners?: string[]; // For split pots
+  actionLog?: Action[]; // History of actions in this hand
 }
