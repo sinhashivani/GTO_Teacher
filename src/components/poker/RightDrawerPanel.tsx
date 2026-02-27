@@ -6,6 +6,8 @@ import { ChevronLeft, ChevronRight, Eye, History, BarChart2 } from "lucide-react
 import { GameState } from "@/lib/poker/types";
 import { InsightPanel } from "./InsightPanel";
 import { motion, AnimatePresence } from "framer-motion";
+import { useLiveQuery } from "dexie-react-hooks";
+import { db } from "@/lib/db";
 
 type Tab = "range" | "history" | "stats";
 
@@ -16,6 +18,7 @@ interface RightDrawerPanelProps {
   winRate?: number;
   profit?: number;
   accuracy?: number;
+  evaluations?: Record<string, any>;
 }
 
 export const RightDrawerPanel: React.FC<RightDrawerPanelProps> = ({
@@ -25,15 +28,19 @@ export const RightDrawerPanel: React.FC<RightDrawerPanelProps> = ({
   winRate = 0,
   profit = 0,
   accuracy = 0,
+  evaluations = {},
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<Tab>("range");
+  const settings = useLiveQuery(() => db.settings.toCollection().first());
 
-  const tabs: { id: Tab; icon: React.ReactNode; label: string }[] = [
+  const tabs: { id: Tab; icon: React.ReactNode; label: string; hidden?: boolean }[] = [
     { id: "range", icon: <Eye className="w-3 h-3" />, label: "Range" },
     { id: "stats", icon: <BarChart2 className="w-3 h-3" />, label: "Stats" },
     { id: "history", icon: <History className="w-3 h-3" />, label: "History" },
   ];
+
+  const visibleTabs = tabs.filter(t => !t.hidden);
 
   return (
     <>
@@ -64,7 +71,7 @@ export const RightDrawerPanel: React.FC<RightDrawerPanelProps> = ({
           >
             {/* Tab buttons */}
             <div className="flex border-b border-tavern-wood">
-              {tabs.map((tab) => (
+              {visibleTabs.map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}

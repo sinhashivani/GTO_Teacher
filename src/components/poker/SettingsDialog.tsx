@@ -3,6 +3,7 @@
 import React from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, type UserSettings } from "@/lib/db";
+import { resetHeroBankroll, resetAllBankrolls } from "@/lib/poker/bankroll";
 import {
   Dialog,
   DialogContent,
@@ -11,7 +12,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Settings } from "lucide-react";
+import { Settings, RefreshCw, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const SettingsDialog: React.FC = () => {
@@ -20,6 +21,18 @@ export const SettingsDialog: React.FC = () => {
   const updateSettings = async (updates: Partial<UserSettings>) => {
     if (settings?.id) {
       await db.settings.update(settings.id, updates);
+    }
+  };
+
+  const handleResetHero = async () => {
+    if (window.confirm("Reset your bankroll? This applies next hand.")) {
+      resetHeroBankroll(settings?.startingStack || 1000);
+    }
+  };
+
+  const handleResetAll = async () => {
+    if (window.confirm("Reset ALL bankrolls (including bots)? This applies next hand.")) {
+      resetAllBankrolls();
     }
   };
 
@@ -36,7 +49,7 @@ export const SettingsDialog: React.FC = () => {
           <Settings className="w-4 h-4 text-tavern-gold" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="bg-tavern-dark border-2 border-tavern-wood text-tavern-gold font-pixel">
+      <DialogContent className="bg-tavern-dark border-2 border-tavern-wood text-tavern-gold font-pixel max-h-[90vh] overflow-y-auto tavern-scrollbar">
         <DialogHeader>
           <DialogTitle className="uppercase tracking-widest text-sm text-tavern-gold">
             Settings
@@ -91,6 +104,77 @@ export const SettingsDialog: React.FC = () => {
             <p className="text-[6px] text-tavern-gold/40">* Applies next hand</p>
           </div>
 
+          {/* Starting Stack */}
+          <div className="flex flex-col gap-2">
+            <label className="text-[9px] uppercase tracking-wider text-tavern-gold/60">
+              Starting Stack
+            </label>
+            <div className="flex gap-2 flex-wrap">
+              {([100, 500, 1000, 2000, 5000] as const).map((amount) => (
+                <Button
+                  key={amount}
+                  className={cn(
+                    "flex-1 uppercase text-[8px] h-8 transition-colors",
+                    settings.startingStack === amount
+                      ? "bg-tavern-gold text-tavern-dark"
+                      : "bg-tavern-dark text-tavern-gold/50 border border-tavern-wood hover:bg-tavern-wood/30"
+                  )}
+                  onClick={() => updateSettings({ startingStack: amount })}
+                >
+                  {amount}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* Credit Mode */}
+          <div className="flex flex-col gap-2">
+            <label className="text-[9px] uppercase tracking-wider text-tavern-gold/60">
+              Credit Mode (Negative Betting)
+            </label>
+            <div className="flex gap-2">
+              {([true, false] as const).map((val) => (
+                <Button
+                  key={String(val)}
+                  className={cn(
+                    "flex-1 uppercase text-[8px] h-8 transition-colors",
+                    settings.creditMode === val
+                      ? "bg-tavern-gold text-tavern-dark"
+                      : "bg-tavern-dark text-tavern-gold/50 border border-tavern-wood hover:bg-tavern-wood/30"
+                  )}
+                  onClick={() => updateSettings({ creditMode: val })}
+                >
+                  {val ? "On" : "Off"}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* Credit Limit */}
+          {settings.creditMode && (
+            <div className="flex flex-col gap-2">
+              <label className="text-[9px] uppercase tracking-wider text-tavern-gold/60">
+                Credit Limit
+              </label>
+              <div className="flex gap-2 flex-wrap">
+                {([-1000, -2000, -5000, -10000] as const).map((limit) => (
+                  <Button
+                    key={limit}
+                    className={cn(
+                      "flex-1 uppercase text-[8px] h-8 transition-colors",
+                      settings.creditLimit === limit
+                        ? "bg-tavern-gold text-tavern-dark"
+                        : "bg-tavern-dark text-tavern-gold/50 border border-tavern-wood hover:bg-tavern-wood/30"
+                    )}
+                    onClick={() => updateSettings({ creditLimit: limit })}
+                  >
+                    {limit}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Player Count */}
           <div className="flex flex-col gap-2">
             <label className="text-[9px] uppercase tracking-wider text-tavern-gold/60">
@@ -115,6 +199,31 @@ export const SettingsDialog: React.FC = () => {
             </div>
           </div>
 
+          {/* Bankroll Resets */}
+          <div className="flex flex-col gap-2">
+            <label className="text-[9px] uppercase tracking-wider text-tavern-gold/60">
+              Bankroll Management
+            </label>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1 bg-tavern-wood/20 border-tavern-wood text-tavern-gold hover:bg-tavern-wood/40 uppercase text-[7px] h-8"
+                onClick={handleResetHero}
+              >
+                <RefreshCw className="w-3 h-3 mr-1" />
+                Reset Mine
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1 bg-tavern-wood/20 border-tavern-wood text-tavern-gold hover:bg-tavern-wood/40 uppercase text-[7px] h-8"
+                onClick={handleResetAll}
+              >
+                <Trash2 className="w-3 h-3 mr-1" />
+                Reset All
+              </Button>
+            </div>
+          </div>
+
           {/* Game Speed */}
           <div className="flex flex-col gap-2">
             <label className="text-[9px] uppercase tracking-wider text-tavern-gold/60">
@@ -133,6 +242,52 @@ export const SettingsDialog: React.FC = () => {
                   onClick={() => updateSettings({ gameSpeed: speed })}
                 >
                   {speed}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* Hand Patterns Toggle */}
+          <div className="flex flex-col gap-2">
+            <label className="text-[9px] uppercase tracking-wider text-tavern-gold/60">
+              Hand Patterns Guide
+            </label>
+            <div className="flex gap-2">
+              {[true, false].map((val) => (
+                <Button
+                  key={String(val)}
+                  className={cn(
+                    "flex-1 uppercase text-[8px] h-8 transition-colors",
+                    settings.showHandGuide === val
+                      ? "bg-tavern-gold text-tavern-dark"
+                      : "bg-tavern-dark text-tavern-gold/50 border border-tavern-wood hover:bg-tavern-wood/30"
+                  )}
+                  onClick={() => updateSettings({ showHandGuide: val })}
+                >
+                  {val ? "Show" : "Hide"}
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* Position Labels Toggle */}
+          <div className="flex flex-col gap-2">
+            <label className="text-[9px] uppercase tracking-wider text-tavern-gold/60">
+              Position Labels (BTN, UTG, etc.)
+            </label>
+            <div className="flex gap-2">
+              {[true, false].map((val) => (
+                <Button
+                  key={String(val)}
+                  className={cn(
+                    "flex-1 uppercase text-[8px] h-8 transition-colors",
+                    settings.showPositionLabels === val
+                      ? "bg-tavern-gold text-tavern-dark"
+                      : "bg-tavern-dark text-tavern-gold/50 border border-tavern-wood hover:bg-tavern-wood/30"
+                  )}
+                  onClick={() => updateSettings({ showPositionLabels: val })}
+                >
+                  {val ? "Show" : "Hide"}
                 </Button>
               ))}
             </div>

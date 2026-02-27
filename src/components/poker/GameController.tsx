@@ -56,6 +56,33 @@ function getSeatPosition(index: number, totalPlayers: number): any {
   return (positions[totalPlayers] || positions[2])[index] || "bottom";
 }
 
+function getPositionLabel(index: number, dealerIndex: number, totalPlayers: number): string {
+  const diff = (index - dealerIndex + totalPlayers) % totalPlayers;
+  
+  if (totalPlayers === 2) {
+    return diff === 0 ? "BTN" : "BB";
+  }
+  
+  if (diff === 0) return "BTN";
+  if (diff === 1) return "SB";
+  if (diff === 2) return "BB";
+  
+  if (totalPlayers === 4) {
+    if (diff === 3) return "CO";
+  }
+  if (totalPlayers === 5) {
+    if (diff === 3) return "UTG";
+    if (diff === 4) return "CO";
+  }
+  if (totalPlayers === 6) {
+    if (diff === 3) return "UTG";
+    if (diff === 4) return "MP";
+    if (diff === 5) return "CO";
+  }
+  
+  return "";
+}
+
 export const GameController: React.FC = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -97,6 +124,8 @@ export const GameController: React.FC = () => {
   }, [lastHandState]);
 
   const currentHandAccuracies = useRef<number[]>([]);
+  const currentHandEvDeltas = useRef<number[]>([]);
+  const currentHandLeaks = useRef<string[]>([]);
   
   // Logical keys for turn and transition to prevent redundant triggers or stalls
   const turnKey = useMemo(() => {
@@ -123,7 +152,7 @@ export const GameController: React.FC = () => {
     ? Math.round((hands?.reduce((sum, h) => sum + h.accuracyScore, 0) || 0) / totalHands)
     : 0;
 
-  const startHand = useCallback((currentSettings: any) => {
+  const startHand = useCallback((currentSettings: any, dealerIndex: number = 0) => {
     setActiveSettings(currentSettings);
     const players = [{ id: "p1", name: "You" }];
     const count = currentSettings?.playerCount || 2;
@@ -138,7 +167,12 @@ export const GameController: React.FC = () => {
       });
     }
 
-    const initialState = pokerEngine.initializeGame(players);
+    const initialState = pokerEngine.initializeGame(
+      players, 
+      currentSettings?.creditMode, 
+      currentSettings?.creditLimit,
+      dealerIndex
+    );
     
     // Load persistent bankrolls
     initialState.players.forEach(p => {
@@ -148,13 +182,16 @@ export const GameController: React.FC = () => {
     setGameState(initialState);
     setEvaluations({});
     currentHandAccuracies.current = [];
+    currentHandEvDeltas.current = [];
+    currentHandLeaks.current = [];
   }, [pokerEngine]);
 
   useEffect(() => {
     async function init() {
       await ensureSettings();
       const s = await db.settings.toCollection().first();
-      startHand(s);
+      // Start first hand with dealer at index 0 (Hero) or random
+      startHand(s, 0);
     }
     init();
   }, [pokerEngine, startHand]);
@@ -181,26 +218,38 @@ export const GameController: React.FC = () => {
 
   const processAction = useCallback(
     async (action: Action) => {
+      let nextState: GameState | null = null;
+      
       setGameState((current) => {
         if (!current) return null;
         try {
-          let newState = handleAction(
+          nextState = handleAction(
             current, 
             action, 
             activeSettings?.creditMode, 
             activeSettings?.creditLimit
           );
-          // Persist all stacks after every action
-          saveAllBankrolls(newState.players);
-          return newState;
+          return nextState;
         } catch (e) {
           console.error("Action error:", e);
           return current;
         }
       });
+
+      // Side-effect after state update (not perfectly synced but better)
+      // Actually, we can't easily get nextState out of setGameState functional update synchronously.
+      // But we can calculate it twice or use a ref.
+      // For now, let's just make the functional update pure and move saveAllBankrolls to an effect.
     },
     [pokerEngine, activeSettings]
   );
+
+  // Auto-persist state changes
+  useEffect(() => {
+    if (gameState?.players) {
+      saveAllBankrolls(gameState.players);
+    }
+  }, [gameState?.players]);
 
   // Reactive settlement and hand persistence
   useEffect(() => {
@@ -214,6 +263,10 @@ export const GameController: React.FC = () => {
         // Hero profit for stats
         const heroInHand = gameState.players.find(p => p.id === "p1")!;
         const profit = (settlement.payouts["p1"] || 0) - heroInHand.totalBet;
+
+        const avgEvDelta = currentHandEvDeltas.current.length > 0
+          ? currentHandEvDeltas.current.reduce((a, b) => a + b, 0) / currentHandEvDeltas.current.length
+          : 0;
 
         // Update state with results
         setGameState(current => {
@@ -231,13 +284,6 @@ export const GameController: React.FC = () => {
           };
         });
 
-        // Persist settlement to bankrolls
-        const finalPlayers = gameState.players.map(p => ({
-          id: p.id,
-          stack: p.stack + (settlement.payouts[p.id] || 0)
-        }));
-        saveAllBankrolls(finalPlayers);
-
         // Add to hand history
         await db.hands.add({
           timestamp: Date.now(),
@@ -251,6 +297,8 @@ export const GameController: React.FC = () => {
           accuracyScore: currentHandAccuracies.current.length > 0
             ? currentHandAccuracies.current.reduce((a, b) => a + b, 0) / currentHandAccuracies.current.length
             : 100,
+          evDelta: avgEvDelta,
+          leaks: [...currentHandLeaks.current]
         });
 
         setEvaluations(evaluationsByPlayerId);
@@ -259,8 +307,15 @@ export const GameController: React.FC = () => {
           evaluations: evaluationsByPlayerId 
         });
         currentHandAccuracies.current = [];
+        currentHandEvDeltas.current = [];
+        currentHandLeaks.current = [];
 
         // Bot Quit Check
+        const finalPlayers = gameState.players.map(p => ({
+          id: p.id,
+          stack: p.stack + (settlement.payouts[p.id] || 0)
+        }));
+
         const quittingBot = finalPlayers.find(p => {
           if (!p.id.startsWith('bot')) return false;
           const player = gameState.players.find(bp => bp.id === p.id)!;
@@ -290,11 +345,11 @@ export const GameController: React.FC = () => {
         
         let nextState;
         if (current.stage === "PREFLOP") {
-          nextState = pokerEngine.transitionToFlop(current);
+          nextState = pokerEngine.transitionToFlop(current, activeSettings?.creditMode, activeSettings?.creditLimit);
         } else if (current.stage === "FLOP") {
-          nextState = pokerEngine.transitionToTurn(current);
+          nextState = pokerEngine.transitionToTurn(current, activeSettings?.creditMode, activeSettings?.creditLimit);
         } else if (current.stage === "TURN") {
-          nextState = pokerEngine.transitionToRiver(current);
+          nextState = pokerEngine.transitionToRiver(current, activeSettings?.creditMode, activeSettings?.creditLimit);
         } else {
           nextState = { ...current, stage: "SHOWDOWN" as const };
         }
@@ -302,15 +357,34 @@ export const GameController: React.FC = () => {
       });
     }, delay);
     return () => clearTimeout(timer);
-  }, [transitionKey, pokerEngine, gameSpeed]);
+  }, [transitionKey, pokerEngine, gameSpeed, activeSettings]);
 
   const onPlayerAction = async (type: ActionType, amount?: number) => {
     if (!gameState || isBotThinking) return;
 
     const s = await db.settings.toCollection().first();
+    const expertScores = BotAI.getExpertScores(gameState);
+    const heroScore = expertScores[type] || 0;
+    const bestScore = Math.max(...Object.values(expertScores));
+    const evDelta = bestScore - heroScore;
+    
+    currentHandAccuracies.current.push(heroScore === bestScore ? 100 : 0);
+    currentHandEvDeltas.current.push(evDelta);
+
+    if (evDelta > 0.5) {
+      let leak = "";
+      if (type === 'FOLD') leak = `Over-folding on ${gameState.stage}`;
+      else if (type === 'RAISE') leak = `Over-aggressive on ${gameState.stage}`;
+      else if (type === 'CALL') leak = `Passive play on ${gameState.stage}`;
+      else if (type === 'CHECK') leak = `Missing value on ${gameState.stage}`;
+      
+      if (leak && !currentHandLeaks.current.includes(leak)) {
+        currentHandLeaks.current.push(leak);
+      }
+    }
+
     const recommendation = BotAI.getAction(gameState, "expert");
     const isCorrect = type === recommendation.type;
-    currentHandAccuracies.current.push(isCorrect ? 100 : 0);
 
     const action: Action = {
       playerId: "p1",
@@ -326,7 +400,8 @@ export const GameController: React.FC = () => {
         why: isCorrect ? "Correct! This is the standard GTO play." : "This is a deviation from the recommended baseline.",
         confidence: 'heuristic',
         alternatives: [] // Ideally BotAI provides these
-      }
+      },
+      scores: expertScores
     };
 
     if (s?.feedbackTiming === "immediate") {
@@ -389,7 +464,7 @@ export const GameController: React.FC = () => {
   const canCheck = player.currentBet === Math.max(...publicState.players.map(p => p.currentBet));
   const callAmount = Math.max(...publicState.players.map(p => p.currentBet)) - player.currentBet;
   const minRaise = Math.max(Math.max(...publicState.players.map(p => p.currentBet)) * 2, 40);
-  const maxRaise = player.stack + player.currentBet;
+  const maxRaise = (activeSettings?.creditMode ? (player.stack - activeSettings.creditLimit) : player.stack) + player.currentBet;
 
   // Hand strength label
   const handResult = player.holeCards.length > 0 ? evaluateHand(player.holeCards, publicState.communityCards) : null;
@@ -462,6 +537,8 @@ export const GameController: React.FC = () => {
           {publicState.players.map((p, idx) => {
             const position = getSeatPosition(idx, publicState.players.length);
             const evaluation = evaluations[p.id];
+            const posLabel = getPositionLabel(idx, publicState.dealerIndex, publicState.players.length);
+            
             return (
               <PlayerSeat
                 key={p.id}
@@ -470,6 +547,8 @@ export const GameController: React.FC = () => {
                 isActive={publicState.activePlayerIndex === idx}
                 position={position}
                 isDealer={publicState.dealerIndex === idx}
+                positionLabel={posLabel}
+                showPositionLabels={settings?.showPositionLabels}
                 holeCards={p.holeCards}
                 isCurrentPlayer={p.id === "p1" || publicState.stage === "SHOWDOWN"}
                 currentBet={p.currentBet}
@@ -501,7 +580,10 @@ export const GameController: React.FC = () => {
         onNextHand={() => {
           db.settings.toCollection().first().then(s => {
             // Force bankroll reload by passing updated settings
-            if (s) startHand(s);
+            if (s) {
+              const nextDealer = gameState ? (gameState.dealerIndex + 1) % currentPlayerCount : 0;
+              startHand(s, nextDealer);
+            }
           });
         }}
         onShowReport={() => setShowReport(true)}

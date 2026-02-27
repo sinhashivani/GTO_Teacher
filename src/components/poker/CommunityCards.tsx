@@ -4,9 +4,14 @@ import { CardView } from "./CardView";
 
 interface CommunityCardsProps {
   cards: CardType[];
+  highlightedCards?: CardType[];
 }
 
-export const CommunityCards: React.FC<CommunityCardsProps> = ({ cards }) => {
+export const CommunityCards: React.FC<CommunityCardsProps> = ({ cards, highlightedCards = [] }) => {
+  const isCardHighlighted = (card: CardType) => {
+    return highlightedCards.some(hc => hc.rank === card.rank && hc.suit === card.suit);
+  };
+
   return (
     <div className="flex flex-col items-center gap-2">
       {/* Card area background */}
@@ -14,7 +19,11 @@ export const CommunityCards: React.FC<CommunityCardsProps> = ({ cards }) => {
         {[0, 1, 2, 3, 4].map((i) => (
           <React.Fragment key={i}>
             {cards[i] ? (
-              <CardView card={cards[i]} delay={i * 0.1} />
+              <CardView 
+                card={cards[i]} 
+                delay={i * 0.1} 
+                highlighted={isCardHighlighted(cards[i])}
+              />
             ) : (
               <div className="w-14 h-20 bg-black/10 border-2 border-dashed border-tavern-gold/10 flex items-center justify-center">
                 <span className="text-tavern-gold/10 text-xs">{"?"}</span>

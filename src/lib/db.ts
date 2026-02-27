@@ -10,6 +10,7 @@ export interface UserSettings {
   playerName: string;
   gameSpeed: 'normal' | 'fast';
   showHandGuide: boolean;
+  showPositionLabels: boolean;
   creditMode: boolean;
   creditLimit: number;
   startingStack: number;
@@ -22,6 +23,8 @@ export interface HandHistory {
   won: boolean;
   profit: number;
   accuracyScore: number;
+  evDelta?: number; // Average EV loss for this hand
+  leaks?: string[]; // Identified leaks in this hand
   reason?: string; // e.g., 'left game'
 }
 
@@ -31,7 +34,7 @@ export class GTODatabase extends Dexie {
 
   constructor() {
     super('GTOTeacherDB');
-    this.version(6).stores({
+    this.version(7).stores({
       settings: '++id',
       hands: '++id, timestamp, won'
     });
@@ -52,6 +55,7 @@ export async function ensureSettings() {
       playerName: 'You',
       gameSpeed: 'normal',
       showHandGuide: false,
+      showPositionLabels: true,
       creditMode: false,
       creditLimit: -2000,
       startingStack: 1000

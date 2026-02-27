@@ -1,13 +1,19 @@
 import { GameState, Action, Player, SidePot } from './types';
 
-export function handleAction(state: GameState, action: Action): GameState {
+export function handleAction(
+  state: GameState, 
+  action: Action,
+  creditMode: boolean = false,
+  creditLimit: number = -2000
+): GameState {
   const activePlayer = state.players[state.activePlayerIndex];
   const numPlayers = state.players.length;
 
   let nextState = { 
     ...state, 
     players: state.players.map(p => ({ ...p })),
-    lastAction: action
+    lastAction: action,
+    actionLog: [...(state.actionLog || []), action]
   };
   let playerUpdate = nextState.players[state.activePlayerIndex];
   playerUpdate.hasActed = true;
@@ -27,28 +33,39 @@ export function handleAction(state: GameState, action: Action): GameState {
 
     case 'CALL':
       const callAmount = currentMaxBet - playerUpdate.currentBet;
-      const actualCall = Math.min(callAmount, playerUpdate.stack);
+      const availableToCall = creditMode ? (playerUpdate.stack - creditLimit) : playerUpdate.stack;
+      const actualCall = Math.min(callAmount, Math.max(0, availableToCall));
+      
       playerUpdate.currentBet += actualCall;
+      playerUpdate.totalBet += actualCall;
       playerUpdate.stack -= actualCall;
       nextState.pot += actualCall;
       break;
 
     case 'RAISE':
       if (!action.amount) throw new Error('Raise amount required');
-      const totalRaise = action.amount;
-      const raiseRequired = totalRaise - playerUpdate.currentBet;
+      const requestedRaise = action.amount;
+      const availableToRaise = creditMode ? (playerUpdate.stack - creditLimit) : playerUpdate.stack;
       
-      if (raiseRequired > playerUpdate.stack) throw new Error('Insufficient chips');
-      if (totalRaise <= currentMaxBet) throw new Error('Raise must be greater than current bet');
+      // If requested raise exceeds stack, go all-in
+      const actualRaise = Math.min(requestedRaise, playerUpdate.currentBet + availableToRaise);
+      const raiseRequired = actualRaise - playerUpdate.currentBet;
       
-      nextState.lastRaiseAmount = totalRaise - currentMaxBet;
-      playerUpdate.currentBet = totalRaise;
+      if (actualRaise <= currentMaxBet && availableToRaise > 0) {
+        // This case is actually a CALL if the stack allows it, but let's be strict
+        throw new Error('Raise must be greater than current bet');
+      }
+      
+      nextState.lastRaiseAmount = Math.max(0, actualRaise - currentMaxBet);
+      playerUpdate.currentBet = actualRaise;
+      playerUpdate.totalBet += raiseRequired;
       playerUpdate.stack -= raiseRequired;
       nextState.pot += raiseRequired;
       
       // All other non-folded players must act again if they have chips
+      // Standard rule: only a full raise re-opens the betting, but user asked for 'make it so people must call the max amount seen'
       nextState.players.forEach((p, i) => {
-        if (i !== state.activePlayerIndex && !p.isFolded && p.stack > 0) {
+        if (i !== state.activePlayerIndex && !p.isFolded && p.stack > (creditMode ? creditLimit : 0)) {
           p.hasActed = false;
         }
       });
@@ -64,16 +81,20 @@ export function handleAction(state: GameState, action: Action): GameState {
   }
 
   // Check if round is over
-  const allActed = nextState.players.every(p => p.isFolded || p.hasActed || p.stack === 0);
+  const allActed = nextState.players.every(p => p.isFolded || p.hasActed || p.stack <= (creditMode ? creditLimit : 0));
   const maxBet = Math.max(...nextState.players.map(p => p.currentBet));
-  const betsMatched = nextState.players.every(p => p.isFolded || p.stack === 0 || p.currentBet === maxBet);
+  const betsMatched = nextState.players.every(p => 
+    p.isFolded || 
+    p.stack <= (creditMode ? creditLimit : 0) || 
+    p.currentBet === maxBet
+  );
 
   if (allActed && betsMatched) {
     return { ...nextState, activePlayerIndex: -1 };
   }
 
   // Find next player
-  nextState.activePlayerIndex = getNextToAct(nextState, state.activePlayerIndex);
+  nextState.activePlayerIndex = getNextToAct(nextState, state.activePlayerIndex, creditMode, creditLimit);
   
   if (nextState.activePlayerIndex === -1) {
     return { ...nextState, activePlayerIndex: -1 };
@@ -82,7 +103,7 @@ export function handleAction(state: GameState, action: Action): GameState {
   return nextState;
 }
 
-function getNextToAct(state: GameState, currentIndex: number): number {
+function getNextToAct(state: GameState, currentIndex: number, creditMode: boolean = false, creditLimit: number = -2000): number {
   const numPlayers = state.players.length;
   const maxBet = Math.max(...state.players.map(p => p.currentBet));
 
@@ -90,10 +111,11 @@ function getNextToAct(state: GameState, currentIndex: number): number {
     const nextIndex = (currentIndex + i) % numPlayers;
     const p = state.players[nextIndex];
     
-    // Player can act if they haven't folded, have chips, and:
+    // Player can act if they haven't folded, have credit, and:
     // 1. Haven't acted this round OR
     // 2. Haven't matched the current max bet
-    if (!p.isFolded && p.stack > 0 && (!p.hasActed || p.currentBet < maxBet)) {
+    const hasCredit = p.stack > (creditMode ? creditLimit : 0);
+    if (!p.isFolded && hasCredit && (!p.hasActed || p.currentBet < maxBet)) {
       return nextIndex;
     }
   }

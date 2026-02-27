@@ -21,6 +21,7 @@ interface ActionBarProps {
   isShowdown?: boolean;
   showdownWon?: boolean;
   onNextHand?: () => void;
+  onShowReport?: () => void;
 }
 
 export const ActionBar: React.FC<ActionBarProps> = ({
@@ -38,6 +39,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
   isShowdown,
   showdownWon,
   onNextHand,
+  onShowReport,
 }) => {
   const [betAmount, setBetAmount] = useState(minRaise);
 
@@ -66,20 +68,20 @@ export const ActionBar: React.FC<ActionBarProps> = ({
       {/* Showdown state */}
       {isShowdown && (
         <div className="flex flex-col items-center gap-3 py-2">
-          <div
-            className={cn(
-              "text-lg font-bold uppercase tracking-widest",
-              showdownWon ? "text-green-400" : "text-red-400"
-            )}
-          >
-            {showdownWon ? "Victory!" : "Defeat!"}
+          <div className="flex gap-4">
+            <button
+              onClick={onShowReport}
+              className="bg-tavern-dark text-tavern-gold px-6 py-3 text-[10px] font-bold uppercase tracking-wider hover:bg-tavern-wood transition-colors border-2 border-tavern-gold/30"
+            >
+              View Hand Report
+            </button>
+            <button
+              onClick={onNextHand}
+              className="bg-tavern-gold text-tavern-dark px-8 py-3 text-[12px] font-bold uppercase tracking-widest hover:bg-tavern-gold-light transition-colors shadow-lg border-2 border-tavern-dark"
+            >
+              Next Hand
+            </button>
           </div>
-          <button
-            onClick={onNextHand}
-            className="bg-tavern-gold text-tavern-dark px-6 py-2 text-[10px] font-bold uppercase tracking-wider hover:bg-tavern-gold-light transition-colors"
-          >
-            Next Hand
-          </button>
         </div>
       )}
 

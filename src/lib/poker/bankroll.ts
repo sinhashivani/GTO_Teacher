@@ -47,7 +47,7 @@ export function getBankroll(playerId: string, defaultStack: number = 1000): numb
 }
 
 export function resetHeroBankroll(startingStack: number): void {
-  setBankroll('player', startingStack);
+  setBankroll('p1', startingStack);
 }
 
 export function resetAllBankrolls(): void {

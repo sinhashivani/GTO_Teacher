@@ -14,6 +14,8 @@ This phase expands the Heads-Up Preflop/Flop trainer into a 2-6 seat multi-stree
 - **Pot Handling:** 
   - Multiple all-ins require side pot calculation. 
   - Logic: Sort all-in amounts. Calculate pot slices based on the smallest all-in. Players who contributed to a slice are eligible for it.
+- **Winning Hands**
+  - Implement Hold’em evaluator; Follow rules in [research/holdem-hand-eval.md](../../../research/holdem-hand-eval.md); Output: handClass, handValue, best5, description; Include unit tests from spec test vectors
 
 ## 2. State Machine Extensions
 - **Streets:** `PREFLOP` -> `FLOP` -> `TURN` -> `RIVER` -> `SHOWDOWN`.
@@ -31,6 +33,9 @@ This phase expands the Heads-Up Preflop/Flop trainer into a 2-6 seat multi-stree
   - **Medium:** Basic GTO/MDF (Minimum Defense Frequency) approximations.
   - **Expert:** Strategy lookup or advanced heuristics.
 - Mixed mode: Assign different difficulty profiles to different seats.
+- Add showdown hand panel and templates toggle; Use templates from [research/holdem-hand-eval.md](../../../research/holdem-hand-eval.md); Show evaluated best hand per player at showdown (handClass + best5 + description)
+- Pot remainder chip rule decision; Define deterministic remainder distribution method (seat order left of dealer recommended); UI decision: show best5 cards vs only hand name during non-showdown states
+- 
 
 ## 4. Debug Panel & UAT
 - **Debug Panel:** Floating overlay (dev only) displaying:
@@ -57,3 +62,4 @@ This phase expands the Heads-Up Preflop/Flop trainer into a 2-6 seat multi-stree
   - `state-machine.test.ts`: Test street transitions.
 - **E2E/UAT:**
   - Manual verification of the Tavern UI with 6 players.
+  - Confirm that logic matches that of [research/holdem-hand-eval.md]

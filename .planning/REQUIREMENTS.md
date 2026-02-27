@@ -9,6 +9,7 @@
   - **Easy**: Simple, human-like baseline with common leaks (over-calling, under-bluffing). No cheating.
   - **Medium**: Solid fundamentals with fewer mistakes.
   - **Expert**: Strong baseline lookup for supported spots. Still no cheating.
+- Poker showdown and hand evaluation; Source of truth: [Hold’em Hand Evaluation Spec](research/holdem-hand-eval.md); Engine must return per-player best5, handClass, handValue, and description; UI must support a side toggle that displays hand templates and the player’s evaluated best hand at showdown
 
 ### 1.2 Coaching & Feedback
 - **Feedback Toggle**:

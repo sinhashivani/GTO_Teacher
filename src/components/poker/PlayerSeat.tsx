@@ -11,12 +11,15 @@ interface PlayerSeatProps {
   isDealer?: boolean;
   isBigBlind?: boolean;
   isSmallBlind?: boolean;
+  positionLabel?: string;
+  showPositionLabels?: boolean;
   holeCards?: CardType[];
   isCurrentPlayer?: boolean;
   currentBet?: number;
   isFolded?: boolean;
   avatar?: string;
   lastAction?: string;
+  highlightedCards?: CardType[];
 }
 
 const positionMap = {
@@ -38,14 +41,21 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
   isDealer,
   isBigBlind,
   isSmallBlind,
+  positionLabel,
+  showPositionLabels = true,
   holeCards,
   isCurrentPlayer,
   currentBet,
   isFolded,
   avatar,
   lastAction,
+  highlightedCards = [],
 }) => {
   const isBottom = position === "bottom";
+
+  const isCardHighlighted = (card: CardType) => {
+    return highlightedCards.some(hc => hc.rank === card.rank && hc.suit === card.suit);
+  };
 
   return (
     <div className={cn("absolute z-10", positionMap[position])}>
@@ -59,6 +69,7 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
                 card={card}
                 hidden={!isCurrentPlayer}
                 className="w-10 h-14"
+                highlighted={isCardHighlighted(card)}
               />
             )) || (
               <>
@@ -111,6 +122,11 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
 
           {/* Position badges */}
           <div className="absolute -top-2 -right-2 flex gap-0.5">
+            {showPositionLabels && positionLabel && (
+              <div className="w-5 h-5 bg-tavern-gold border border-tavern-dark flex items-center justify-center text-tavern-dark text-[7px] font-bold">
+                {positionLabel}
+              </div>
+            )}
             {isDealer && (
               <div className="w-5 h-5 bg-tavern-parchment border border-tavern-dark flex items-center justify-center text-tavern-dark text-[8px] font-bold">
                 D
@@ -138,6 +154,7 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
                 card={card}
                 hidden={!isCurrentPlayer}
                 className="w-12 h-[68px]"
+                highlighted={isCardHighlighted(card)}
               />
             )) || (
               <>

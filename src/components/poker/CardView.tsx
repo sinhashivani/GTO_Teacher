@@ -8,6 +8,7 @@ interface CardViewProps {
   hidden?: boolean;
   className?: string;
   delay?: number;
+  highlighted?: boolean;
 }
 
 const SuitIcon = ({ suit }: { suit: CardType["suit"] }) => {
@@ -16,7 +17,7 @@ const SuitIcon = ({ suit }: { suit: CardType["suit"] }) => {
   return <span className={cn("text-lg leading-none", color)}>{icons[suit]}</span>;
 };
 
-export const CardView: React.FC<CardViewProps> = ({ card, hidden, className, delay = 0 }) => {
+export const CardView: React.FC<CardViewProps> = ({ card, hidden, className, delay = 0, highlighted }) => {
   if (hidden || !card) {
     return (
       <motion.div
@@ -45,6 +46,7 @@ export const CardView: React.FC<CardViewProps> = ({ card, hidden, className, del
   }
 
   const isRed = card.suit === "h" || card.suit === "d";
+  const displayRank = card.rank === "T" ? "10" : card.rank;
 
   return (
     <motion.div
@@ -52,7 +54,8 @@ export const CardView: React.FC<CardViewProps> = ({ card, hidden, className, del
       animate={{ y: 0, opacity: 1 }}
       transition={{ delay, duration: 0.3 }}
       className={cn(
-        "w-14 h-20 bg-tavern-parchment border-2 border-tavern-dark flex flex-col p-1 items-center justify-between card-shadow",
+        "w-14 h-20 bg-tavern-parchment border-2 flex flex-col p-1 items-center justify-between card-shadow transition-all duration-300",
+        highlighted ? "border-tavern-gold gold-glow scale-110 z-10" : "border-tavern-dark",
         className
       )}
     >
@@ -62,7 +65,7 @@ export const CardView: React.FC<CardViewProps> = ({ card, hidden, className, del
           isRed ? "text-red-700" : "text-tavern-dark"
         )}
       >
-        {card.rank}
+        {displayRank}
       </div>
       <SuitIcon suit={card.suit} />
       <div
@@ -71,7 +74,7 @@ export const CardView: React.FC<CardViewProps> = ({ card, hidden, className, del
           isRed ? "text-red-700" : "text-tavern-dark"
         )}
       >
-        {card.rank}
+        {displayRank}
       </div>
     </motion.div>
   );

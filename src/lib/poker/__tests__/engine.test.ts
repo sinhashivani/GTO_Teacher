@@ -69,6 +69,73 @@ describe('Poker Engine', () => {
     assert.strictEqual(state.activePlayerIndex, -1);
   });
 
+  describe('Table Positions & Rotation', () => {
+    it('should assign correct positions for 2 players (Heads-up)', () => {
+      const game = new PokerGame(1000, 10, 20);
+      const players = [{ id: 'p1', name: 'A' }, { id: 'p2', name: 'B' }];
+      
+      // Dealer = 0
+      const state0 = game.initializeGame(players, false, -2000, 0);
+      assert.strictEqual(state0.players[0].position, 'SB');
+      assert.strictEqual(state0.players[1].position, 'BB');
+      assert.strictEqual(state0.activePlayerIndex, 0); // SB acts first preflop
+
+      // Dealer = 1
+      const state1 = game.initializeGame(players, false, -2000, 1);
+      assert.strictEqual(state1.players[1].position, 'SB');
+      assert.strictEqual(state1.players[0].position, 'BB');
+      assert.strictEqual(state1.activePlayerIndex, 1);
+    });
+
+    it('should assign correct positions for 3 players', () => {
+      const game = new PokerGame(1000, 10, 20);
+      const players = [{ id: 'p1', name: 'A' }, { id: 'p2', name: 'B' }, { id: 'p3', name: 'C' }];
+      
+      // Dealer = 0
+      const state = game.initializeGame(players, false, -2000, 0);
+      assert.strictEqual(state.players[0].position, 'BTN');
+      assert.strictEqual(state.players[1].position, 'SB');
+      assert.strictEqual(state.players[2].position, 'BB');
+      assert.strictEqual(state.activePlayerIndex, 0); // BTN acts first preflop (UTG)
+    });
+
+    it('should assign correct positions for 6 players', () => {
+      const game = new PokerGame(1000, 10, 20);
+      const players = [
+        { id: 'p1', name: 'A' }, { id: 'p2', name: 'B' }, { id: 'p3', name: 'C' },
+        { id: 'p4', name: 'D' }, { id: 'p5', name: 'E' }, { id: 'p6', name: 'F' }
+      ];
+      
+      // Dealer = 0
+      const state = game.initializeGame(players, false, -2000, 0);
+      assert.strictEqual(state.players[0].position, 'BTN');
+      assert.strictEqual(state.players[1].position, 'SB');
+      assert.strictEqual(state.players[2].position, 'BB');
+      assert.strictEqual(state.players[3].position, 'UTG');
+      assert.strictEqual(state.players[4].position, 'HJ');
+      assert.strictEqual(state.players[5].position, 'CO');
+      
+      assert.strictEqual(state.activePlayerIndex, 3); // UTG acts first preflop
+    });
+
+    it('should rotate the dealer button correctly', () => {
+      const game = new PokerGame(1000, 10, 20);
+      const players = [{ id: 'p1', name: 'A' }, { id: 'p2', name: 'B' }, { id: 'p3', name: 'C' }];
+      
+      // Hand 1: Dealer = 0
+      const state1 = game.initializeGame(players, false, -2000, 0);
+      assert.strictEqual(state1.dealerIndex, 0);
+      
+      // Hand 2: Rotate dealer
+      const nextDealer = (state1.dealerIndex + 1) % players.length;
+      const state2 = game.initializeGame(players, false, -2000, nextDealer);
+      assert.strictEqual(state2.dealerIndex, 1);
+      assert.strictEqual(state2.players[1].position, 'BTN');
+      assert.strictEqual(state2.players[2].position, 'SB');
+      assert.strictEqual(state2.players[0].position, 'BB');
+    });
+  });
+
   it('should correctly rotate turns and skip all-in players', () => {
     const game = new PokerGame(1000, 10, 20);
     const players = [

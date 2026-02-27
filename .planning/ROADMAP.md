@@ -57,3 +57,21 @@ Plans:
 Plans:
 - [x] 06-01-PLAN.md — Async Street Transitions & Action Display [PH6-TRANSITION]
 - [x] 06-02-PLAN.md — Turn Order & Bot AI Sync [PH6-ENGINE]
+
+### Phase 7: Hand Evaluation & Settlement
+
+**Goal:** Implement Texas Hold’em hand evaluation, winner determination, pot settlement, and bankroll persistence.
+**Status:** COMPLETE
+
+Plans:
+- [x] 07-01-PLAN.md — Hand Evaluation & Settlement Implementation [PH7-ENGINE, PH7-UI]
+
+### Phase 9: Learning & Bankroll Features
+
+**Goal:** Add advanced bankroll controls, Credit Mode, and expanded structured GTO coaching.
+**Status:** COMPLETE
+
+Plans:
+- [x] 09-01-PLAN.md — Bankroll Controls & Credit Mode [PH9-BANKROLL]
+- [x] 09-02-PLAN.md — Expanded GTO Coaching & Glossary [PH9-COACH]
+- [x] 09-03-PLAN.md — Security Hardening & Stable Settings [PH9-SECURITY]

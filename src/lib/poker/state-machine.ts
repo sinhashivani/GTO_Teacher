@@ -1,5 +1,6 @@
 import { Deck } from './deck';
-import { GameState, Action, Player, GameStage } from './types';
+import { GameState, Action, Player, GameStage, Position } from './types';
+import { getBankroll } from './bankroll';
 
 export class PokerGame {
   private deck: Deck;
@@ -12,14 +13,60 @@ export class PokerGame {
     this.deck = new Deck();
   }
 
-  initializeGame(playerData: { id: string, name: string }[]): GameState {
+  static getPositionMapping(dealerIndex: number, numPlayers: number): Record<number, Position> {
+    const mapping: Record<number, Position> = {};
+    
+    if (numPlayers === 2) {
+      mapping[dealerIndex] = 'SB'; // Also BTN, but SB takes precedence for HUD
+      mapping[(dealerIndex + 1) % numPlayers] = 'BB';
+      return mapping;
+    }
+
+    // Standard positions relative to dealer
+    const positions: Position[] = ['BTN', 'SB', 'BB', 'UTG', 'HJ', 'CO'];
+    
+    if (numPlayers === 3) {
+      mapping[dealerIndex] = 'BTN';
+      mapping[(dealerIndex + 1) % numPlayers] = 'SB';
+      mapping[(dealerIndex + 2) % numPlayers] = 'BB';
+    } else if (numPlayers === 4) {
+      mapping[dealerIndex] = 'BTN';
+      mapping[(dealerIndex + 1) % numPlayers] = 'SB';
+      mapping[(dealerIndex + 2) % numPlayers] = 'BB';
+      mapping[(dealerIndex + 3) % numPlayers] = 'CO';
+    } else if (numPlayers === 5) {
+      mapping[dealerIndex] = 'BTN';
+      mapping[(dealerIndex + 1) % numPlayers] = 'SB';
+      mapping[(dealerIndex + 2) % numPlayers] = 'BB';
+      mapping[(dealerIndex + 3) % numPlayers] = 'HJ';
+      mapping[(dealerIndex + 4) % numPlayers] = 'CO';
+    } else if (numPlayers === 6) {
+      mapping[dealerIndex] = 'BTN';
+      mapping[(dealerIndex + 1) % numPlayers] = 'SB';
+      mapping[(dealerIndex + 2) % numPlayers] = 'BB';
+      mapping[(dealerIndex + 3) % numPlayers] = 'UTG';
+      mapping[(dealerIndex + 4) % numPlayers] = 'HJ';
+      mapping[(dealerIndex + 5) % numPlayers] = 'CO';
+    }
+
+    return mapping;
+  }
+
+  initializeGame(
+    playerData: { id: string, name: string }[], 
+    creditMode: boolean = false, 
+    creditLimit: number = -2000,
+    dealerIndex: number = 0
+  ): GameState {
     this.deck.reset();
     this.deck.shuffle();
 
     const numPlayers = playerData.length;
-    const dealerIndex = 0; // Fixed for start, can rotate in higher level logic
+    const positionMapping = PokerGame.getPositionMapping(dealerIndex, numPlayers);
     
-    let sbIndex, bbIndex, firstActorIndex;
+    let sbIndex = -1;
+    let bbIndex = -1;
+    let firstActorIndex = -1;
 
     if (numPlayers === 2) {
       // Heads-up: Dealer is SB
@@ -35,13 +82,13 @@ export class PokerGame {
 
     const players: Player[] = playerData.map((p, i) => {
       let currentBet = 0;
-      let stack = this.initialStack;
+      let stack = getBankroll(p.id, this.initialStack);
 
       if (i === sbIndex) {
-        currentBet = Math.min(this.smallBlind, stack);
+        currentBet = Math.min(this.smallBlind, creditMode ? (stack - creditLimit) : stack);
         stack -= currentBet;
       } else if (i === bbIndex) {
-        currentBet = Math.min(this.bigBlind, stack);
+        currentBet = Math.min(this.bigBlind, creditMode ? (stack - creditLimit) : stack);
         stack -= currentBet;
       }
 
@@ -51,20 +98,21 @@ export class PokerGame {
         stack,
         holeCards: this.deck.draw(2),
         currentBet,
+        totalBet: currentBet,
         hasActed: false,
         isFolded: false,
+        position: positionMapping[i],
       };
     });
 
-    // Ensure the first actor actually has chips
-    let finalFirstActor = firstActorIndex;
-    if (players[finalFirstActor].stack === 0) {
-      for (let i = 1; i <= numPlayers; i++) {
-        const nextIndex = (firstActorIndex + i) % numPlayers;
-        if (!players[nextIndex].isFolded && players[nextIndex].stack > 0) {
-          finalFirstActor = nextIndex;
-          break;
-        }
+    // Ensure the first actor actually has credit
+    let finalFirstActor = -1;
+    for (let i = 0; i < numPlayers; i++) {
+      const checkIndex = (firstActorIndex + i) % numPlayers;
+      const hasCredit = players[checkIndex].stack > (creditMode ? creditLimit : 0);
+      if (!players[checkIndex].isFolded && hasCredit) {
+        finalFirstActor = checkIndex;
+        break;
       }
     }
 
@@ -76,10 +124,16 @@ export class PokerGame {
       activePlayerIndex: finalFirstActor,
       dealerIndex,
       lastRaiseAmount: this.bigBlind,
+      actionLog: [],
     };
   }
 
-  transitionToStage(state: GameState, nextStage: GameStage): GameState {
+  transitionToStage(
+    state: GameState, 
+    nextStage: GameStage,
+    creditMode: boolean = false,
+    creditLimit: number = -2000
+  ): GameState {
     const numToDraw = nextStage === 'FLOP' ? 3 : (nextStage === 'TURN' || nextStage === 'RIVER' ? 1 : 0);
     const newCards = numToDraw > 0 ? this.deck.draw(numToDraw) : [];
 
@@ -91,7 +145,7 @@ export class PokerGame {
     }));
 
     // Post-flop: SB acts first, or the next non-folded player after the dealer
-    const firstActor = this.getPostFlopFirstActor(state.dealerIndex, players);
+    const firstActor = this.getPostFlopFirstActor(state.dealerIndex, players, creditMode, creditLimit);
 
     return {
       ...state,
@@ -104,18 +158,38 @@ export class PokerGame {
     };
   }
 
-  private getPostFlopFirstActor(dealerIndex: number, players: Player[]): number {
+  static getPublicState(state: GameState, playerId: string): GameState {
+    const hero = state.players.find(p => p.id === playerId);
+    const heroFolded = hero?.isFolded || false;
+
+    return {
+      ...state,
+      players: state.players.map(p => ({
+        ...p,
+        holeCards: (p.id === playerId || state.stage === 'SHOWDOWN' || (heroFolded && !p.isFolded)) 
+          ? [...p.holeCards] 
+          : []
+      }))
+    };
+  }
+
+  private getPostFlopFirstActor(
+    dealerIndex: number, 
+    players: Player[],
+    creditMode: boolean = false,
+    creditLimit: number = -2000
+  ): number {
     const numPlayers = players.length;
     
-    // Betting can only happen if at least 2 players have chips
-    const playersWithChips = players.filter(p => !p.isFolded && p.stack > 0);
-    if (playersWithChips.length <= 1) {
+    // Betting can only happen if at least 2 players have credit
+    const playersWithCredit = players.filter(p => !p.isFolded && p.stack > (creditMode ? creditLimit : 0));
+    if (playersWithCredit.length <= 1) {
       return -1;
     }
 
     for (let i = 1; i <= numPlayers; i++) {
       const nextIndex = (dealerIndex + i) % numPlayers;
-      if (!players[nextIndex].isFolded && players[nextIndex].stack > 0) {
+      if (!players[nextIndex].isFolded && players[nextIndex].stack > (creditMode ? creditLimit : 0)) {
         return nextIndex;
       }
     }
@@ -123,15 +197,15 @@ export class PokerGame {
     return -1;
   }
 
-  transitionToFlop(state: GameState): GameState {
-    return this.transitionToStage(state, 'FLOP');
+  transitionToFlop(state: GameState, creditMode?: boolean, creditLimit?: number): GameState {
+    return this.transitionToStage(state, 'FLOP', creditMode, creditLimit);
   }
 
-  transitionToTurn(state: GameState): GameState {
-    return this.transitionToStage(state, 'TURN');
+  transitionToTurn(state: GameState, creditMode?: boolean, creditLimit?: number): GameState {
+    return this.transitionToStage(state, 'TURN', creditMode, creditLimit);
   }
 
-  transitionToRiver(state: GameState): GameState {
-    return this.transitionToStage(state, 'RIVER');
+  transitionToRiver(state: GameState, creditMode?: boolean, creditLimit?: number): GameState {
+    return this.transitionToStage(state, 'RIVER', creditMode, creditLimit);
   }
 }
