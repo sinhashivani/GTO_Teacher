@@ -35,6 +35,7 @@
 ## Quick Tasks Completed
 | Task | Date | Status |
 |------|------|--------|
+| NPC Rotation & UI Refinement (Immediate refill in HU, flicker effect, total bet display, all-in auto-call) | 2026-02-27 | DONE |
 | Persistent Actions & Enhanced Winner Reporting (Multi-player support, Winning card lists) | 2026-02-27 | DONE |
 | Proportional Raise Amounts (1/3, 1/2, 2/3, POT presets) | 2026-02-27 | DONE |
 | NPC & Betting Overhaul (30 NPCs, Exit Thresholds, Strict Limits, Slider Fix) | 2026-02-27 | DONE |
