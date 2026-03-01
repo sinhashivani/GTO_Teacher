@@ -3,7 +3,80 @@ import { evaluateHand } from './evaluator';
 
 export type BotDifficulty = 'easy' | 'medium' | 'expert' | 'mixed';
 
+export interface NPCData {
+  name: string;
+  difficulty: BotDifficulty;
+  thresholdType: 'broke' | 'target_1k' | 'profit_200';
+}
+
 export class BotAI {
+  static NPC_POOL: NPCData[] = [
+    // Easy (10)
+    { name: "The Drunk Bard", difficulty: "easy", thresholdType: "broke" },
+    { name: "The Clumsy Peasant", difficulty: "easy", thresholdType: "broke" },
+    { name: "The Jolly Merchant", difficulty: "easy", thresholdType: "target_1k" },
+    { name: "The Nervous Squire", difficulty: "easy", thresholdType: "broke" },
+    { name: "The Boastful Hunter", difficulty: "easy", thresholdType: "profit_200" },
+    { name: "The Silly Shepherd", difficulty: "easy", thresholdType: "broke" },
+    { name: "The Sleepy Cook", difficulty: "easy", thresholdType: "broke" },
+    { name: "The Gossip Maid", difficulty: "easy", thresholdType: "target_1k" },
+    { name: "The Loud Blacksmith", difficulty: "easy", thresholdType: "broke" },
+    { name: "The Simple Miller", difficulty: "easy", thresholdType: "profit_200" },
+    // Medium (10)
+    { name: "The Cunning Rogue", difficulty: "medium", thresholdType: "target_1k" },
+    { name: "The Wandering Mercenary", difficulty: "medium", thresholdType: "profit_200" },
+    { name: "The Tavern Regular", difficulty: "medium", thresholdType: "target_1k" },
+    { name: "The Stoic Guard", difficulty: "medium", thresholdType: "broke" },
+    { name: "The Sharp Gambler", difficulty: "medium", thresholdType: "profit_200" },
+    { name: "The Traveling Monk", difficulty: "medium", thresholdType: "target_1k" },
+    { name: "The Bold Sailor", difficulty: "medium", thresholdType: "broke" },
+    { name: "The Grumpy Innkeeper", difficulty: "medium", thresholdType: "target_1k" },
+    { name: "The Quiet Scribe", difficulty: "medium", thresholdType: "profit_200" },
+    { name: "The Vigilant Ranger", difficulty: "medium", thresholdType: "broke" },
+    // Expert (10)
+    { name: "The Iron Knight", difficulty: "expert", thresholdType: "profit_200" },
+    { name: "The High Sorcerer", difficulty: "expert", thresholdType: "target_1k" },
+    { name: "The Mysterious Traveler", difficulty: "expert", thresholdType: "profit_200" },
+    { name: "The Noble Earl", difficulty: "expert", thresholdType: "target_1k" },
+    { name: "The Master Assassin", difficulty: "expert", thresholdType: "profit_200" },
+    { name: "The Wise Sage", difficulty: "expert", thresholdType: "target_1k" },
+    { name: "The Ruthless Warlord", difficulty: "expert", thresholdType: "profit_200" },
+    { name: "The Arcane Scholar", difficulty: "expert", thresholdType: "target_1k" },
+    { name: "The Royal Diplomat", difficulty: "expert", thresholdType: "profit_200" },
+    { name: "The Silent Bluffs", difficulty: "expert", thresholdType: "target_1k" },
+  ];
+
+  static getRandomNPC(difficulty: BotDifficulty, excludedNames: string[]): NPCData {
+    const available = this.NPC_POOL.filter(n => n.difficulty === difficulty && !excludedNames.includes(n.name));
+    if (available.length === 0) {
+      // If all are excluded, pick any of the correct difficulty
+      const anyOfDiff = this.NPC_POOL.filter(n => n.difficulty === difficulty);
+      return anyOfDiff[Math.floor(Math.random() * anyOfDiff.length)];
+    }
+    return available[Math.floor(Math.random() * available.length)];
+  }
+
+  static shouldBotExit(player: Player): boolean {
+    if (player.isEmpty) return false;
+    
+    const stack = player.stack;
+    const initialStack = player.initialStack || 1000;
+    const thresholdType = player.thresholdType || 'broke';
+
+    switch (thresholdType) {
+      case 'broke':
+        // Default broke limit
+        const limit = this.getCreditLimit(player.difficulty as BotDifficulty || 'medium');
+        return stack <= limit || stack <= 0; // prompt mentioned 0 money
+      case 'target_1k':
+        return stack >= 1000;
+      case 'profit_200':
+        return stack >= initialStack * 2;
+      default:
+        return false;
+    }
+  }
+
   static getCreditLimit(difficulty: BotDifficulty): number {
     switch (difficulty) {
       case 'easy': return -500;
@@ -156,5 +229,27 @@ export class BotAI {
     }
     
     return action;
+  }
+
+  static isCharacteristicAction(difficulty: BotDifficulty, actionType: ActionType, callAmount: number, score: number): boolean {
+    switch (difficulty) {
+      case 'easy':
+        // Easy bots "characteristically" call when they should fold, or raise randomly
+        if (actionType === 'CALL' && score < 100) return true;
+        if (actionType === 'RAISE' && Math.random() < 0.2) return true;
+        return false;
+      case 'medium':
+        // Medium bots "characteristically" fold to big bets or play solid but predictable
+        if (actionType === 'FOLD' && callAmount > 100) return true;
+        if (actionType === 'CHECK' && score < 200) return true;
+        return false;
+      case 'expert':
+        // Expert bots "characteristically" raise for value or bluff with high scores/pot odds
+        if (actionType === 'RAISE' && score > 300) return true;
+        if (actionType === 'CALL' && callAmount > 0 && score > 200) return true;
+        return false;
+      default:
+        return false;
+    }
   }
 }

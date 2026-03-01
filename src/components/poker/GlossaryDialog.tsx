@@ -29,6 +29,30 @@ const TERMS = [
   {
     term: "Implied Odds",
     definition: "The amount of money you expect to win on later streets if you hit your draw."
+  },
+  {
+    term: "BTN (Button)",
+    definition: "The Dealer position. The most advantageous seat, acting last on all post-flop streets."
+  },
+  {
+    term: "SB (Small Blind)",
+    definition: "The seat to the left of the dealer. Posts a forced partial bet and acts first post-flop."
+  },
+  {
+    term: "BB (Big Blind)",
+    definition: "The seat to the left of the Small Blind. Posts a full forced bet and acts last pre-flop."
+  },
+  {
+    term: "UTG (Under the Gun)",
+    definition: "The seat to the left of the Big Blind. Acts first pre-flop and must play very tight ranges."
+  },
+  {
+    term: "HJ (Hijack)",
+    definition: "The seat two positions to the right of the Dealer. A middle position with moderate range freedom."
+  },
+  {
+    term: "CO (Cutoff)",
+    definition: "The seat to the immediate right of the Dealer. A very strong position for stealing blinds."
   }
 ];
 

@@ -93,9 +93,10 @@ export function evaluate7(cards: Card[]): HandResult {
           handClass,
           classRank: CLASS_RANKS[handClass],
           best5,
+          highlightCards: best5,
           tiebreak: [highStraight],
           handValue: [CLASS_RANKS[handClass], highStraight],
-          description: isRoyal ? 'Royal Flush' : `Straight Flush to ${valueToName[highStraight]}`
+          description: isRoyal ? 'Royal Flush' : `${valueToName[highStraight]} High Straight Flush`
         };
       }
     }
@@ -105,15 +106,17 @@ export function evaluate7(cards: Card[]): HandResult {
   if (quads.length > 0) {
     const quadRank = quads[0];
     const kickers = getKickers([quadRank], 1);
-    const best5 = [...cardsByRank.get(quadRank)!, ...getKickerCards([quadRank], 1)];
+    const quadCards = cardsByRank.get(quadRank)!;
+    const best5 = [...quadCards, ...getKickerCards([quadRank], 1)];
     const tiebreak = [quadRank, kickers[0]];
     return {
       handClass: 'Four of a Kind',
       classRank: CLASS_RANKS['Four of a Kind'],
       best5,
+      highlightCards: quadCards,
       tiebreak,
       handValue: [CLASS_RANKS['Four of a Kind'], ...tiebreak],
-      description: `Four of a kind, ${valueToPlural[quadRank]} with ${valueToName[kickers[0]]} kicker`
+      description: `Four of a Kind, ${valueToPlural[quadRank]}`
     };
   }
 
@@ -121,15 +124,18 @@ export function evaluate7(cards: Card[]): HandResult {
   if ((trips.length >= 1 && (trips.length > 1 || pairs.length >= 1))) {
     const tripRank = trips[0];
     const pairRank = trips.length > 1 ? trips[1] : pairs[0];
-    const best5 = [...cardsByRank.get(tripRank)!, ...cardsByRank.get(pairRank)!.slice(0, 2)];
+    const tripCards = cardsByRank.get(tripRank)!;
+    const pairCards = cardsByRank.get(pairRank)!.slice(0, 2);
+    const best5 = [...tripCards, ...pairCards];
     const tiebreak = [tripRank, pairRank];
     return {
       handClass: 'Full House',
       classRank: CLASS_RANKS['Full House'],
       best5,
+      highlightCards: best5,
       tiebreak,
       handValue: [CLASS_RANKS['Full House'], ...tiebreak],
-      description: `Full house, ${valueToPlural[tripRank]} full of ${valueToPlural[pairRank]}`
+      description: `Full House, ${valueToPlural[tripRank]} over ${valueToPlural[pairRank]}`
     };
   }
 
@@ -143,9 +149,10 @@ export function evaluate7(cards: Card[]): HandResult {
         handClass: 'Flush',
         classRank: CLASS_RANKS['Flush'],
         best5,
+        highlightCards: best5,
         tiebreak,
         handValue: [CLASS_RANKS['Flush'], ...tiebreak],
-        description: `Flush, ${tiebreak.map(v => valueToName[v]).join(', ')} high`
+        description: `${valueToName[tiebreak[0]]} High Flush`
       };
     }
   }
@@ -159,9 +166,10 @@ export function evaluate7(cards: Card[]): HandResult {
       handClass: 'Straight',
       classRank: CLASS_RANKS['Straight'],
       best5,
+      highlightCards: best5,
       tiebreak: [highStraight],
       handValue: [CLASS_RANKS['Straight'], highStraight],
-      description: `Straight to ${valueToName[highStraight]}`
+      description: `${valueToName[highStraight]} High Straight`
     };
   }
 
@@ -169,15 +177,17 @@ export function evaluate7(cards: Card[]): HandResult {
   if (trips.length > 0) {
     const tripRank = trips[0];
     const kickers = getKickers([tripRank], 2);
-    const best5 = [...cardsByRank.get(tripRank)!, ...getKickerCards([tripRank], 2)];
+    const tripCards = cardsByRank.get(tripRank)!;
+    const best5 = [...tripCards, ...getKickerCards([tripRank], 2)];
     const tiebreak = [tripRank, ...kickers];
     return {
       handClass: 'Three of a Kind',
       classRank: CLASS_RANKS['Three of a Kind'],
       best5,
+      highlightCards: tripCards,
       tiebreak,
       handValue: [CLASS_RANKS['Three of a Kind'], ...tiebreak],
-      description: `Three of a kind, ${valueToPlural[tripRank]} with ${kickers.map(v => valueToName[v]).join(' and ')}`
+      description: `Three of a Kind, ${valueToPlural[tripRank]}`
     };
   }
 
@@ -186,15 +196,18 @@ export function evaluate7(cards: Card[]): HandResult {
     const highPair = pairs[0];
     const lowPair = pairs[1];
     const kickers = getKickers([highPair, lowPair], 1);
-    const best5 = [...cardsByRank.get(highPair)!, ...cardsByRank.get(lowPair)!, ...getKickerCards([highPair, lowPair], 1)];
+    const highCards = cardsByRank.get(highPair)!;
+    const lowCards = cardsByRank.get(lowPair)!;
+    const best5 = [...highCards, ...lowCards, ...getKickerCards([highPair, lowPair], 1)];
     const tiebreak = [highPair, lowPair, kickers[0]];
     return {
       handClass: 'Two Pair',
       classRank: CLASS_RANKS['Two Pair'],
       best5,
+      highlightCards: [...highCards, ...lowCards],
       tiebreak,
       handValue: [CLASS_RANKS['Two Pair'], ...tiebreak],
-      description: `Two pair, ${valueToPlural[highPair]} and ${valueToPlural[lowPair]} with ${valueToName[kickers[0]]} kicker`
+      description: `Two Pair, ${valueToPlural[highPair]} and ${valueToPlural[lowPair]}`
     };
   }
 
@@ -202,15 +215,17 @@ export function evaluate7(cards: Card[]): HandResult {
   if (pairs.length === 1) {
     const pairRank = pairs[0];
     const kickers = getKickers([pairRank], 3);
-    const best5 = [...cardsByRank.get(pairRank)!, ...getKickerCards([pairRank], 3)];
+    const pairCards = cardsByRank.get(pairRank)!;
+    const best5 = [...pairCards, ...getKickerCards([pairRank], 3)];
     const tiebreak = [pairRank, ...kickers];
     return {
       handClass: 'Pair',
       classRank: CLASS_RANKS['Pair'],
       best5,
+      highlightCards: pairCards,
       tiebreak,
       handValue: [CLASS_RANKS['Pair'], ...tiebreak],
-      description: `Pair of ${valueToPlural[pairRank]} with ${kickers.map(v => valueToName[v]).join(', ')}`
+      description: `Pair of ${valueToPlural[pairRank]}`
     };
   }
 
@@ -221,9 +236,10 @@ export function evaluate7(cards: Card[]): HandResult {
     handClass: 'High Card',
     classRank: CLASS_RANKS['High Card'],
     best5,
+    highlightCards: [best5[0]], // Only the high card
     tiebreak: kickers,
     handValue: [CLASS_RANKS['High Card'], ...kickers],
-    description: `High card ${valueToName[kickers[0]]}, then ${kickers.slice(1).map(v => valueToName[v]).join(', ')}`
+    description: `${valueToName[kickers[0]]} High Card`
   };
 }
 

@@ -53,65 +53,106 @@ export class PokerGame {
   }
 
   initializeGame(
-    playerData: { id: string, name: string }[], 
+    playerData: { id: string, name: string, isEmpty?: boolean, difficulty?: string, initialStack?: number, thresholdType?: string }[], 
     creditMode: boolean = false, 
     creditLimit: number = -2000,
-    dealerIndex: number = 0
+    dealerIndex: number = 0,
+    overrideBlinds?: { sb: number, bb: number }
   ): GameState {
     this.deck.reset();
     this.deck.shuffle();
 
-    const numPlayers = playerData.length;
-    const positionMapping = PokerGame.getPositionMapping(dealerIndex, numPlayers);
-    
-    let sbIndex = -1;
-    let bbIndex = -1;
-    let firstActorIndex = -1;
+    // Blind scaling by difficulty if not overridden
+    const firstBot = playerData.find(p => p.difficulty);
+    const diff = (firstBot?.difficulty || 'medium') as any;
+    const sb = overrideBlinds?.sb || (diff === 'easy' ? 50 : diff === 'medium' ? 150 : diff === 'expert' ? 1500 : 500);
+    const bb = overrideBlinds?.bb || (diff === 'easy' ? 100 : diff === 'medium' ? 300 : diff === 'expert' ? 3000 : 1000);
 
-    if (numPlayers === 2) {
-      // Heads-up: Dealer is SB
-      sbIndex = dealerIndex;
-      bbIndex = (dealerIndex + 1) % numPlayers;
-      firstActorIndex = sbIndex;
+    const activePlayersIndices = playerData
+      .map((p, i) => p.isEmpty ? -1 : i)
+      .filter(i => i !== -1);
+    
+    const numActivePlayers = activePlayersIndices.length;
+    
+    // Position indices within activePlayersIndices
+    let sbActiveIdx = -1;
+    let bbActiveIdx = -1;
+    let firstActorActiveIdx = -1;
+
+    if (numActivePlayers === 2) {
+      sbActiveIdx = activePlayersIndices.indexOf(dealerIndex);
+      if (sbActiveIdx === -1) {
+         sbActiveIdx = 0;
+      }
+      bbActiveIdx = (sbActiveIdx + 1) % numActivePlayers;
+      firstActorActiveIdx = sbActiveIdx;
     } else {
-      // Multiplayer (3+)
-      sbIndex = (dealerIndex + 1) % numPlayers;
-      bbIndex = (dealerIndex + 2) % numPlayers;
-      firstActorIndex = (dealerIndex + 3) % numPlayers;
+      const dealerActiveIdx = activePlayersIndices.indexOf(dealerIndex);
+      const baseIdx = dealerActiveIdx === -1 ? 0 : dealerActiveIdx;
+      sbActiveIdx = (baseIdx + 1) % numActivePlayers;
+      bbActiveIdx = (baseIdx + 2) % numActivePlayers;
+      firstActorActiveIdx = (baseIdx + 3) % numActivePlayers;
     }
 
-    const players: Player[] = playerData.map((p, i) => {
-      let currentBet = 0;
-      let stack = getBankroll(p.id, this.initialStack);
+    const sbActualIndex = activePlayersIndices[sbActiveIdx];
+    const bbActualIndex = activePlayersIndices[bbActiveIdx];
+    const firstActorActualIndex = activePlayersIndices[firstActorActiveIdx];
 
-      if (i === sbIndex) {
-        currentBet = Math.min(this.smallBlind, creditMode ? (stack - creditLimit) : stack);
+    const players: Player[] = playerData.map((p, i) => {
+      if (p.isEmpty) {
+        return {
+          id: p.id,
+          name: "Empty Seat",
+          stack: 0,
+          holeCards: [],
+          currentBet: 0,
+          totalBet: 0,
+          hasActed: true,
+          isFolded: true,
+          isAllIn: false,
+          isEmpty: true,
+        };
+      }
+
+      let currentBet = 0;
+      let stack = p.initialStack || 1000;
+
+      if (i === sbActualIndex) {
+        currentBet = Math.min(sb, creditMode ? (stack - creditLimit) : stack);
         stack -= currentBet;
-      } else if (i === bbIndex) {
-        currentBet = Math.min(this.bigBlind, creditMode ? (stack - creditLimit) : stack);
+      } else if (i === bbActualIndex) {
+        currentBet = Math.min(bb, creditMode ? (stack - creditLimit) : stack);
         stack -= currentBet;
       }
 
+      const activeIdx = activePlayersIndices.indexOf(i);
+      const dealerActiveIdx = activePlayersIndices.indexOf(dealerIndex);
+      const relativeToDealer = (activeIdx - (dealerActiveIdx === -1 ? 0 : dealerActiveIdx) + numActivePlayers) % numActivePlayers;
+      
       return {
         id: p.id,
         name: p.name,
         stack,
+        difficulty: p.difficulty,
+        initialStack: p.initialStack,
+        thresholdType: p.thresholdType as any,
         holeCards: this.deck.draw(2),
         currentBet,
         totalBet: currentBet,
         hasActed: false,
         isFolded: false,
-        position: positionMapping[i],
+        isAllIn: stack <= (creditMode ? creditLimit : 0),
+        position: PokerGame.getPositionMapping(0, numActivePlayers)[relativeToDealer],
       };
     });
 
-    // Ensure the first actor actually has credit
     let finalFirstActor = -1;
-    for (let i = 0; i < numPlayers; i++) {
-      const checkIndex = (firstActorIndex + i) % numPlayers;
-      const hasCredit = players[checkIndex].stack > (creditMode ? creditLimit : 0);
-      if (!players[checkIndex].isFolded && hasCredit) {
-        finalFirstActor = checkIndex;
+    for (let i = 0; i < numActivePlayers; i++) {
+      const checkIdx = (activePlayersIndices.indexOf(firstActorActualIndex) + i) % numActivePlayers;
+      const actualCheckIdx = activePlayersIndices[checkIdx];
+      const hasCredit = players[actualCheckIdx].stack > (creditMode ? creditLimit : 0);
+      if (!players[actualCheckIdx].isFolded && !players[actualCheckIdx].isAllIn && hasCredit) {
+        finalFirstActor = actualCheckIdx;
         break;
       }
     }
@@ -123,7 +164,7 @@ export class PokerGame {
       players,
       activePlayerIndex: finalFirstActor,
       dealerIndex,
-      lastRaiseAmount: this.bigBlind,
+      lastRaiseAmount: bb,
       actionLog: [],
     };
   }
@@ -142,6 +183,7 @@ export class PokerGame {
       ...p,
       currentBet: 0,
       hasActed: false,
+      isAllIn: p.isAllIn || (p.stack <= (creditMode ? creditLimit : 0) && !p.isFolded),
     }));
 
     // Post-flop: SB acts first, or the next non-folded player after the dealer
@@ -181,15 +223,15 @@ export class PokerGame {
   ): number {
     const numPlayers = players.length;
     
-    // Betting can only happen if at least 2 players have credit
-    const playersWithCredit = players.filter(p => !p.isFolded && p.stack > (creditMode ? creditLimit : 0));
+    // Betting can only happen if at least 2 players have credit and aren't all-in
+    const playersWithCredit = players.filter(p => !p.isFolded && !p.isAllIn && p.stack > (creditMode ? creditLimit : 0));
     if (playersWithCredit.length <= 1) {
       return -1;
     }
 
     for (let i = 1; i <= numPlayers; i++) {
       const nextIndex = (dealerIndex + i) % numPlayers;
-      if (!players[nextIndex].isFolded && players[nextIndex].stack > (creditMode ? creditLimit : 0)) {
+      if (!players[nextIndex].isFolded && !players[nextIndex].isAllIn && players[nextIndex].stack > (creditMode ? creditLimit : 0)) {
         return nextIndex;
       }
     }

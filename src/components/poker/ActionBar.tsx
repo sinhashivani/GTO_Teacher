@@ -15,6 +15,7 @@ interface ActionBarProps {
   minRaise: number;
   maxRaise: number;
   pot: number;
+  heroBalance: number;
   handStrengthLabel?: string;
   disabled?: boolean;
   isBotThinking?: boolean;
@@ -33,6 +34,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
   minRaise,
   maxRaise,
   pot,
+  heroBalance,
   handStrengthLabel,
   disabled,
   isBotThinking,
@@ -43,10 +45,40 @@ export const ActionBar: React.FC<ActionBarProps> = ({
 }) => {
   const [betAmount, setBetAmount] = useState(minRaise);
 
-  // Reset bet when minRaise changes
+  // Set a proportional default raise when minRaise changes
+  // We prefer 1/2 pot or 2/3 pot as a default if it's within range
   React.useEffect(() => {
-    setBetAmount(minRaise);
-  }, [minRaise]);
+    const halfPot = Math.floor(pot / 2);
+    // If we can't afford a minRaise, we are effectively all-in
+    if (maxRaise <= minRaise) {
+      setBetAmount(maxRaise);
+      return;
+    }
+    const defaultBet = Math.max(minRaise, Math.min(maxRaise, halfPot > minRaise ? halfPot : minRaise));
+    setBetAmount(defaultBet);
+  }, [minRaise, maxRaise, pot]);
+
+  const handlePreset = (fraction: number | 'allin') => {
+    if (fraction === 'allin') {
+      setBetAmount(maxRaise);
+      return;
+    }
+    
+    // Proportional to current pot
+    const amount = Math.floor(pot * fraction);
+    // Clamp between min and max. If max < min, then max wins (all-in)
+    const clamped = maxRaise <= minRaise ? maxRaise : Math.max(minRaise, Math.min(maxRaise, amount));
+    setBetAmount(clamped);
+  };
+
+  const handleNextHand = () => {
+    // If balance is 0, must view report first
+    if (heroBalance <= 0) {
+      if (onShowReport) onShowReport();
+      return;
+    }
+    if (onNextHand) onNextHand();
+  };
 
   return (
     <div className="w-full wood-panel px-4 py-3 md:px-6 md:py-4">
@@ -76,10 +108,10 @@ export const ActionBar: React.FC<ActionBarProps> = ({
               View Hand Report
             </button>
             <button
-              onClick={onNextHand}
+              onClick={handleNextHand}
               className="bg-tavern-gold text-tavern-dark px-8 py-3 text-[12px] font-bold uppercase tracking-widest hover:bg-tavern-gold-light transition-colors shadow-lg border-2 border-tavern-dark"
             >
-              Next Hand
+              { heroBalance <= 0 ? "Review to Continue" : "Next Hand" }
             </button>
           </div>
         </div>
@@ -97,6 +129,27 @@ export const ActionBar: React.FC<ActionBarProps> = ({
       {/* Action buttons + slider */}
       {!isShowdown && !isBotThinking && (
         <div className="flex flex-col gap-3">
+          {/* Raise Presets */}
+          {canRaise && (
+            <div className="flex justify-center gap-2 mb-1">
+              {[
+                { label: '1/2', val: 0.5 },
+                { label: '2x', val: 2 },
+                { label: '3x', val: 3 },
+                { label: 'MAX', val: 'allin' as const }
+              ].map(preset => (
+                <button
+                  key={preset.label}
+                  disabled={disabled}
+                  onClick={() => handlePreset(preset.val)}
+                  className="px-2 py-1 border border-tavern-gold/30 bg-black/20 text-[7px] uppercase text-tavern-gold/70 hover:bg-tavern-gold/10 hover:text-tavern-gold transition-colors cursor-pointer"
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Raise slider */}
           {canRaise && (
             <div className="flex items-center gap-3 px-2">

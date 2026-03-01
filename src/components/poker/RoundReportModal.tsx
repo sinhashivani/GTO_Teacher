@@ -11,18 +11,32 @@ import { GameState, HandResult } from "@/lib/poker/types";
 import { CardView } from "./CardView";
 import { cn } from "@/lib/utils";
 import { determineWinners } from "@/lib/poker/evaluator";
+import { updateBankroll } from "@/lib/poker/bankroll";
 
-import { ChevronLeft, ChevronRight, BookOpen, Info } from "lucide-react";
+import { ChevronLeft, ChevronRight, BookOpen, Info, RotateCcw } from "lucide-react";
 import { GlossaryDialog } from "./GlossaryDialog";
+
+interface RoundReportModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  allHands: any[];
+  currentBalance?: number;
+}
 
 export const RoundReportModal: React.FC<RoundReportModalProps> = ({
   isOpen,
   onClose,
   allHands = [],
+  currentBalance = 1000,
 }) => {
   const [currentIndex, setCurrentHandIndex] = React.useState(0);
   const [isGlossaryOpen, setIsGlossaryOpen] = React.useState(false);
   const [highlightTerm, setHighlightTerm] = React.useState("");
+
+  const handleReset = async () => {
+    updateBankroll("p1", 1000);
+    onClose();
+  };
 
   const openGlossary = (term: string) => {
     setHighlightTerm(term);
@@ -62,6 +76,30 @@ export const RoundReportModal: React.FC<RoundReportModalProps> = ({
   const heroEval = evaluations["p1"];
   const winners = gameState.winners || [];
   const didHeroWin = winners.includes("p1");
+
+  // Identify the best opponent hand to compare against
+  const opponentEvals = Object.entries(evaluations)
+    .filter(([id]) => id !== "p1")
+    .sort((a, b) => {
+      const valA = a[1].handValue;
+      const valB = b[1].handValue;
+      for (let i = 0; i < Math.max(valA.length, valB.length); i++) {
+        if ((valA[i] || 0) > (valB[i] || 0)) return -1;
+        if ((valA[i] || 0) < (valB[i] || 0)) return 1;
+      }
+      return 0;
+    });
+
+  const bestOpponent = opponentEvals[0];
+  const bestOpponentId = bestOpponent?.[0];
+  const bestOpponentEval = bestOpponent?.[1];
+  const bestOpponentPlayer = gameState.players.find(p => p.id === bestOpponentId);
+
+  // Determine who to label as "The Winner"
+  const actualWinnerId = winners[0];
+  const isSplitPot = winners.length > 1;
+  const winnerPlayer = gameState.players.find(p => p.id === actualWinnerId);
+  const winnerEval = evaluations[actualWinnerId];
 
   return (
     <>
@@ -119,7 +157,7 @@ export const RoundReportModal: React.FC<RoundReportModalProps> = ({
               <div className="flex flex-col gap-1 p-3 bg-black/40 border border-tavern-wood/20">
                 <span className="text-[10px] uppercase text-tavern-gold/50">Winner</span>
                 <span className="text-xs uppercase truncate">
-                  {winners.length > 1 ? "Split Pot" : (gameState.players.find(p => p.id === winners[0])?.name || "Unknown")}
+                  {isSplitPot ? "Split Pot" : (winnerPlayer?.name || "Unknown")}
                 </span>
               </div>
               <div className="flex flex-col gap-1 p-3 bg-black/40 border border-tavern-wood/20">
@@ -130,13 +168,34 @@ export const RoundReportModal: React.FC<RoundReportModalProps> = ({
               </div>
             </div>
 
+            {/* Winning Hand Breakdown */}
+            <div className="bg-tavern-gold/10 border border-tavern-gold/30 p-4 flex flex-col items-center gap-2">
+              <span className="text-[10px] uppercase text-tavern-gold/60 font-bold">Winning Hand Breakdown</span>
+              <div className="text-center">
+                <p className="text-sm font-bold text-tavern-parchment uppercase">
+                  {isSplitPot ? "Best Hands: " : `${winnerPlayer?.name || 'Winner'} won with `}
+                  <span className="text-tavern-gold">{winnerEval?.description}</span>
+                </p>
+                {winnerEval && (
+                  <p className="text-[9px] text-tavern-gold/60 mt-1 uppercase tracking-tighter">
+                    Winning Cards: {winnerEval.highlightCards.map(c => `${c.rank}${c.suit.toUpperCase()}`).join(', ')}
+                  </p>
+                )}
+              </div>
+            </div>
+
             {/* Cards Display */}
             <div className="flex flex-col gap-6">
               <div className="flex flex-col items-center gap-3">
                 <h4 className="text-xs uppercase tracking-widest text-tavern-gold/60">Community Board</h4>
                 <div className="flex gap-2 p-2 bg-black/20 border border-tavern-wood/10">
                   {gameState.communityCards.map((card, i) => (
-                    <CardView key={i} card={card} className="w-12 h-16" />
+                    <CardView 
+                      key={i} 
+                      card={card} 
+                      className="w-12 h-16" 
+                      highlighted={winnerEval?.highlightCards.some(hc => hc.rank === card.rank && hc.suit === card.suit)}
+                    />
                   ))}
                 </div>
               </div>
@@ -146,26 +205,38 @@ export const RoundReportModal: React.FC<RoundReportModalProps> = ({
                   <h4 className="text-[10px] uppercase tracking-widest text-tavern-gold/60">Your Hand</h4>
                   <div className="flex gap-2">
                     {gameState.players.find(p => p.id === "p1")?.holeCards.map((card, i) => (
-                      <CardView key={i} card={card} className="w-12 h-16" />
+                      <CardView 
+                        key={i} 
+                        card={card} 
+                        className="w-12 h-16" 
+                        highlighted={heroEval?.highlightCards.some(hc => hc.rank === card.rank && hc.suit === card.suit)}
+                      />
                     ))}
                   </div>
                   {heroEval && (
-                    <p className="text-[9px] text-center italic text-tavern-parchment/80 max-w-[120px]">
+                    <p className="text-[9px] text-center italic text-tavern-parchment/80 max-w-[150px]">
                       {heroEval.description}
                     </p>
                   )}
                 </div>
 
                 <div className="flex flex-col items-center gap-3">
-                  <h4 className="text-[10px] uppercase tracking-widest text-tavern-gold/60">Opponent</h4>
+                  <h4 className="text-[10px] uppercase tracking-widest text-tavern-gold/60">
+                    {didHeroWin ? "Best Opponent" : "Winner"} ({bestOpponentPlayer?.name || "Opponent"})
+                  </h4>
                   <div className="flex gap-2">
-                    {gameState.players.find(p => p.id !== "p1" && !p.isFolded)?.holeCards.map((card, i) => (
-                      <CardView key={i} card={card} className="w-12 h-16" />
+                    {bestOpponentPlayer?.holeCards.map((card, i) => (
+                      <CardView 
+                        key={i} 
+                        card={card} 
+                        className="w-12 h-16" 
+                        highlighted={bestOpponentEval?.highlightCards.some(hc => hc.rank === card.rank && hc.suit === card.suit)}
+                      />
                     ))}
                   </div>
-                  {Object.entries(evaluations).find(([id]) => id !== "p1")?.[1] && (
-                    <p className="text-[9px] text-center italic text-tavern-parchment/80 max-w-[120px]">
-                      {Object.entries(evaluations).find(([id]) => id !== "p1")![1].description}
+                  {bestOpponentEval && (
+                    <p className="text-[9px] text-center italic text-tavern-parchment/80 max-w-[150px]">
+                      {bestOpponentEval.description}
                     </p>
                   )}
                 </div>
@@ -279,6 +350,22 @@ export const RoundReportModal: React.FC<RoundReportModalProps> = ({
               </div>
             </div>
           </div>
+
+          {currentBalance <= 0 && (
+            <div className="mt-8 p-6 bg-red-950/20 border-2 border-red-900/50 flex flex-col items-center gap-4 text-center">
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-bold text-red-400 uppercase tracking-widest">Balance Depleted</span>
+                <p className="text-[10px] text-red-300/70 italic">To continue your training, review your performance above then reset your balance.</p>
+              </div>
+              <button
+                onClick={handleReset}
+                className="w-full py-4 bg-red-700 hover:bg-red-600 text-white font-bold uppercase tracking-widest transition-colors flex items-center justify-center gap-2"
+              >
+                <RotateCcw className="w-4 h-4" />
+                Reset Balance to 1000 & Restart
+              </button>
+            </div>
+          )}
 
           <button
             onClick={onClose}

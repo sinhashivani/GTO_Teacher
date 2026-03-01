@@ -4,13 +4,13 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { useSearchParams, useRouter } from "next/navigation";
 import { PokerGame } from "@/lib/poker/state-machine";
 import { handleAction } from "@/lib/poker/betting";
-import { GameState, ActionType, Action } from "@/lib/poker/types";
+import { GameState, ActionType, Action, Player } from "@/lib/poker/types";
 import { db, ensureSettings } from "@/lib/db";
 import { BotAI, BotDifficulty } from "@/lib/poker/bot";
 import { useCoaching } from "@/lib/useCoaching";
 import { evaluateHand, determineWinners } from "@/lib/poker/evaluator";
 import { settlePot } from "@/lib/poker/settlement";
-import { getBankroll, updateBankroll, saveAllBankrolls } from "@/lib/poker/bankroll";
+import { getBankroll, updateBankroll, saveAllBankrolls, setBankroll } from "@/lib/poker/bankroll";
 import { TavernLayout } from "./TavernLayout";
 import { PokerTable } from "./PokerTable";
 import { PlayerSeat } from "./PlayerSeat";
@@ -25,20 +25,15 @@ import { BankrollHeader } from "./BankrollHeader";
 import { RightDrawerPanel } from "./RightDrawerPanel";
 import { SettingsDialog } from "./SettingsDialog";
 import { DebugPanel } from "./DebugPanel";
+import { BotInspectionModal, BotPerformanceAction } from "./BotInspectionModal";
 import { Button } from "@/components/ui/button";
 import { BookOpen } from "lucide-react";
 import { useLiveQuery } from "dexie-react-hooks";
 
-const OPPONENT_NAMES: Record<string, string> = {
-  easy: "The Drunk Bard",
-  medium: "The Cunning Rogue",
-  expert: "The Iron Knight",
-};
-
 const OPPONENT_AVATARS: Record<string, string> = {
-  easy: "\u{1F3B6}",
-  medium: "\u{1F5E1}",
-  expert: "\u{1F6E1}",
+  easy: "🎶",
+  medium: "🗡️",
+  expert: "🛡️",
 };
 
 function getSeatPosition(index: number, totalPlayers: number): any {
@@ -102,6 +97,20 @@ export const GameController: React.FC = () => {
   const [showReport, setShowReport] = useState(false);
   const [lastHandState, setLastHandState] = useState<{ gameState: GameState, evaluations: Record<string, any> } | null>(null);
   const [isGlossaryOpen, setIsGlossaryOpen] = useState(false);
+  const [inspectedBotId, setInspectedBotId] = useState<string | null>(null);
+  const [botPerformance, setBotPerformance] = useState<Record<string, BotPerformanceAction[]>>({});
+  const [flickerSeatIndex, setFlickerSeatIndex] = useState<number | null>(null);
+  const [sessionPlayers, setSessionPlayers] = useState<{id: string, name: string, difficulty?: string, isEmpty?: boolean, initialStack?: number, thresholdType?: string}[]>([]);
+  const sessionPlayersRef = useRef(sessionPlayers);
+  const gameStateRef = useRef(gameState);
+
+  useEffect(() => {
+    sessionPlayersRef.current = sessionPlayers;
+    gameStateRef.current = gameState;
+  }, [sessionPlayers, gameState]);
+
+  const pendingRefills = useRef<{ seatIndex: number, handsLeft: number }[]>([]);
+
   const { feedback, setFeedback, evaluateAction } = useCoaching();
 
   // Settings buffering: Difficulty and Player Count are locked when hand starts
@@ -109,7 +118,7 @@ export const GameController: React.FC = () => {
   const currentPlayerCount = activeSettings?.playerCount || settings?.playerCount || 2;
   const gameSpeed = settings?.gameSpeed || "normal";
 
-  const opponentAvatar = OPPONENT_AVATARS[currentDifficulty === 'mixed' ? 'medium' : currentDifficulty] || "\u{1F5E1}";
+  const opponentAvatar = OPPONENT_AVATARS[currentDifficulty === 'mixed' ? 'medium' : currentDifficulty] || "🗡️";
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -152,69 +161,157 @@ export const GameController: React.FC = () => {
     ? Math.round((hands?.reduce((sum, h) => sum + h.accuracyScore, 0) || 0) / totalHands)
     : 0;
 
-  const startHand = useCallback((currentSettings: any, dealerIndex: number = 0) => {
-    setActiveSettings(currentSettings);
-    const players = [{ id: "p1", name: "You" }];
-    const count = currentSettings?.playerCount || 2;
-    const diff = currentSettings?.difficulty || "medium";
+    const startHand = useCallback((currentSettings: any, dealerIndex: number = 0, isNewSession: boolean = false) => {
+      setActiveSettings(currentSettings);
+      const count = currentSettings?.playerCount || 2;
+      const diff = currentSettings?.difficulty || "medium";
+  
+      setSessionPlayers(prev => {
+        let players = isNewSession ? [{ id: "p1", name: "You" }] : [...prev];
+  
+        // Initialize or adjust player count
+        if (isNewSession || players.length !== count) {
+          players = [{ id: "p1", name: "You" }];
+          for (let i = 1; i < count; i++) {
+            const botDiff = diff === 'mixed' ? (['easy', 'medium', 'expert'][i % 3] as BotDifficulty) : diff as BotDifficulty;
+            const npc = BotAI.getRandomNPC(botDiff, players.map(p => p.name));
+            players.push({
+              id: `bot-seat-${i}`,
+              name: npc.name,
+              difficulty: npc.difficulty,
+              thresholdType: npc.thresholdType,
+              initialStack: currentSettings?.startingStack || 1000,
+              isEmpty: false
+            });
+            // Ensure bankroll is set for this NPC
+            setBankroll(`bot-seat-${i}`, currentSettings?.startingStack || 1000);
+          }
+        } else {
+          // Process pending refills
+          pendingRefills.current = pendingRefills.current.map(refill => ({
+            ...refill,
+            handsLeft: refill.handsLeft - 1
+          }));
+    
+          const readyRefills = pendingRefills.current.filter(r => r.handsLeft <= 0);
+          pendingRefills.current = pendingRefills.current.filter(r => r.handsLeft > 0);
+    
+          // Identify quitting bots from previous hand results
+          const currentGameState = gameStateRef.current;
+          if (currentGameState) {
+            players = players.map((p, idx) => {
+              const finishedPlayer = currentGameState.players[idx];
+              if (!finishedPlayer || finishedPlayer.id === 'p1') {
+                if (finishedPlayer) p.initialStack = finishedPlayer.stack;
+                return p;
+              }
+              
+              if (BotAI.shouldBotExit(finishedPlayer)) {
+                // Heads-up: Replace immediately with flicker
+                if (count === 2) {
+                  const botDiff = diff === 'mixed' ? 'medium' : diff as BotDifficulty;
+                  const npc = BotAI.getRandomNPC(botDiff, [p.name]);
+                  const botId = `bot-seat-${idx}`;
+                  
+                  // Trigger flicker
+                  setFlickerSeatIndex(idx);
+                  setTimeout(() => setFlickerSeatIndex(null), 1000);
 
-    for (let i = 1; i < count; i++) {
-      const botDiff = diff === 'mixed' ? (['easy', 'medium', 'expert'][i % 3]) : diff;
-      players.push({
-        id: `bot-${i}`,
-        name: `${OPPONENT_NAMES[botDiff as BotDifficulty]} #${i}`,
-        difficulty: botDiff
+                  // Set bankroll to random amount as requested
+                  const randomStack = Math.floor(Math.random() * 1500) + 500;
+                  setBankroll(botId, randomStack);
+
+                  return {
+                    id: botId,
+                    name: npc.name,
+                    difficulty: npc.difficulty,
+                    thresholdType: npc.thresholdType,
+                    initialStack: randomStack,
+                    isEmpty: false
+                  };
+                }
+                
+                // Multi-player: Normal exit
+                return { ...p, isEmpty: true };
+              }
+              p.initialStack = finishedPlayer.stack; 
+              return p;
+            });
+          }
+    
+          // Perform refills
+          readyRefills.forEach(refill => {
+            const idx = refill.seatIndex;
+            const rand = Math.random();
+            const botDiff = rand < 0.3 ? 'expert' : (rand < 0.7 ? 'medium' : 'easy');
+            const npc = BotAI.getRandomNPC(botDiff as BotDifficulty, players.map(p => p.name));
+            
+            const botId = `bot-seat-${idx}`;
+            players[idx] = {
+              id: botId, 
+              name: npc.name,
+              difficulty: npc.difficulty,
+              thresholdType: npc.thresholdType,
+              initialStack: currentSettings?.startingStack || 1000,
+              isEmpty: false
+            };
+            // Reset bankroll for the new NPC
+            setBankroll(botId, currentSettings?.startingStack || 1000);
+          });
+        }
+
+        // Initialize game with updated players
+        const initialState = pokerEngine.initializeGame(
+          players, 
+          currentSettings?.creditMode, 
+          currentSettings?.creditLimit,
+          dealerIndex
+        );
+        
+        setGameState(initialState);
+        setEvaluations({});
+        currentHandAccuracies.current = [];
+        currentHandEvDeltas.current = [];
+        currentHandLeaks.current = [];
+
+        return players;
       });
-    }
-
-    const initialState = pokerEngine.initializeGame(
-      players, 
-      currentSettings?.creditMode, 
-      currentSettings?.creditLimit,
-      dealerIndex
-    );
-    
-    // Load persistent bankrolls
-    initialState.players.forEach(p => {
-      p.stack = getBankroll(p.id, currentSettings?.startingStack || 1000);
-    });
-    
-    setGameState(initialState);
-    setEvaluations({});
-    currentHandAccuracies.current = [];
-    currentHandEvDeltas.current = [];
-    currentHandLeaks.current = [];
-  }, [pokerEngine]);
-
-  useEffect(() => {
-    async function init() {
-      await ensureSettings();
-      const s = await db.settings.toCollection().first();
-      // Start first hand with dealer at index 0 (Hero) or random
-      startHand(s, 0);
-    }
-    init();
-  }, [pokerEngine, startHand]);
-
-  useEffect(() => {
-    const handleLeave = async () => {
-      if (gameState && gameState.stage !== "END" && gameState.stage !== "SHOWDOWN") {
-        const player = gameState.players.find((p) => p.id === "p1")!;
-        await db.hands.add({
-          timestamp: Date.now(),
-          finalState: gameState,
-          won: false,
-          profit: 0, // Simplified profit tracking
-          accuracyScore: 0,
-          reason: "left game",
-        });
+    }, [pokerEngine]);
+  
+    useEffect(() => {
+      let isSubscribed = true;
+      async function init() {
+        await ensureSettings();
+        const s = await db.settings.toCollection().first();
+        if (isSubscribed) {
+          // Start first hand with dealer at index 0 (Hero) or random
+          startHand(s, 0, true);
+        }
       }
-      router.push("/");
-    };
-
-    window.addEventListener('leave-game', handleLeave);
-    return () => window.removeEventListener('leave-game', handleLeave);
-  }, [gameState, router]);
+      init();
+      return () => { isSubscribed = false; };
+    }, [startHand]);
+  
+    useEffect(() => {
+      const handleLeave = async () => {
+        if (gameState && gameState.stage !== "END" && gameState.stage !== "SHOWDOWN") {
+          const player = gameState.players.find((p) => p.id === "p1")!;
+          await db.hands.add({
+            timestamp: Date.now(),
+            finalState: gameState,
+            won: false,
+            profit: 0, // Simplified profit tracking
+            accuracyScore: 0,
+            reason: "left game",
+          });
+        }
+        router.push("/");
+      };
+  
+      window.addEventListener('leave-game', handleLeave);
+      return () => window.removeEventListener('leave-game', handleLeave);
+    }, [gameState, router]);
+  
 
   const processAction = useCallback(
     async (action: Action) => {
@@ -312,23 +409,22 @@ export const GameController: React.FC = () => {
 
         // Bot Quit Check
         const finalPlayers = gameState.players.map(p => ({
-          id: p.id,
+          ...p,
           stack: p.stack + (settlement.payouts[p.id] || 0)
         }));
 
-        const quittingBot = finalPlayers.find(p => {
-          if (!p.id.startsWith('bot')) return false;
-          const player = gameState.players.find(bp => bp.id === p.id)!;
-          const threshold = player.difficulty === 'easy' ? -500 : (player.difficulty === 'medium' ? -1000 : -2000);
-          return p.stack <= threshold;
+        finalPlayers.forEach((p, idx) => {
+          if (!p.id.startsWith('bot') || p.isEmpty) return;
+          
+          if (BotAI.shouldBotExit(p as Player)) {
+            // This bot quits
+            console.log(`Bot ${p.name} at seat ${idx} is quitting (threshold met)`);
+            pendingRefills.current.push({
+              seatIndex: idx,
+              handsLeft: Math.floor(Math.random() * 3) + 1 // 1-3 hands
+            });
+          }
         });
-
-        if (quittingBot) {
-          setTimeout(() => {
-            alert(`${quittingBot.id} has run out of funds and left the table.`);
-            router.push('/');
-          }, 2000);
-        }
       };
 
       runSettlement();
@@ -404,7 +500,7 @@ export const GameController: React.FC = () => {
       scores: expertScores
     };
 
-    if (s?.feedbackTiming === "immediate") {
+    if (s?.feedbackTiming === "immediate" || true) { // Force immediate for now to ensure visibility
       evaluateAction(gameState, action);
     }
 
@@ -436,7 +532,35 @@ export const GameController: React.FC = () => {
       const timer = setTimeout(async () => {
         try {
           const s = await db.settings.toCollection().first();
-          const botAction = BotAI.getAction(gameState, s?.difficulty || "medium");
+          const botAction = BotAI.getAction(gameState, (activePlayer.difficulty || "medium") as BotDifficulty);
+          
+          // Track Performance
+          const result = evaluateHand(activePlayer.holeCards, gameState.communityCards);
+          const handScore = result.classRank * 100;
+          const currentMaxBet = Math.max(...gameState.players.map(p => p.currentBet));
+          const callAmount = currentMaxBet - activePlayer.currentBet;
+          
+          const isChar = BotAI.isCharacteristicAction(
+            (activePlayer.difficulty || "medium") as BotDifficulty,
+            botAction.type,
+            callAmount,
+            handScore
+          );
+
+          setBotPerformance(prev => {
+            const botId = activePlayer.id;
+            const history = prev[botId] || [];
+            return {
+              ...prev,
+              [botId]: [{
+                type: botAction.type,
+                stage: gameState.stage,
+                isCharacteristic: isChar,
+                timestamp: Date.now()
+              }, ...history].slice(0, 5) // Keep last 5
+            };
+          });
+
           processAction(botAction);
         } catch (e) {
           console.error("Bot action error:", e);
@@ -463,8 +587,9 @@ export const GameController: React.FC = () => {
 
   const canCheck = player.currentBet === Math.max(...publicState.players.map(p => p.currentBet));
   const callAmount = Math.max(...publicState.players.map(p => p.currentBet)) - player.currentBet;
-  const minRaise = Math.max(Math.max(...publicState.players.map(p => p.currentBet)) * 2, 40);
-  const maxRaise = (activeSettings?.creditMode ? (player.stack - activeSettings.creditLimit) : player.stack) + player.currentBet;
+  const currentMaxBet = Math.max(...publicState.players.map(p => p.currentBet));
+  const minRaise = Math.max(currentMaxBet + (gameState?.lastRaiseAmount || 20), currentMaxBet + 20, 40);
+  const maxRaise = player.stack + player.currentBet;
 
   // Hand strength label
   const handResult = player.holeCards.length > 0 ? evaluateHand(player.holeCards, publicState.communityCards) : null;
@@ -494,17 +619,40 @@ export const GameController: React.FC = () => {
       {hands && (
         <RoundReportModal 
           isOpen={showReport} 
-          onClose={() => setShowReport(false)} 
+          onClose={() => {
+            setShowReport(false);
+            // If balance was 0, reload to apply reset
+            if (player.stack <= 0) {
+              window.location.reload();
+            }
+          }} 
           allHands={hands}
+          currentBalance={player.stack}
         />
       )}
 
       <GlossaryDialog isOpen={isGlossaryOpen} onOpenChange={setIsGlossaryOpen} />
 
+      {inspectedBotId && (
+        <BotInspectionModal
+          isOpen={!!inspectedBotId}
+          onClose={() => setInspectedBotId(null)}
+          bot={{
+            id: inspectedBotId,
+            name: publicState.players.find(p => p.id === inspectedBotId)?.name || "Bot",
+            difficulty: publicState.players.find(p => p.id === inspectedBotId)?.difficulty || "medium",
+            avatar: OPPONENT_AVATARS[publicState.players.find(p => p.id === inspectedBotId)?.difficulty as BotDifficulty || 'medium'],
+            holeCards: publicState.players.find(p => p.id === inspectedBotId)?.holeCards
+          }}
+          performance={botPerformance[inspectedBotId] || []}
+          heroFolded={publicState.players.find(p => p.id === 'p1')?.isFolded || false}
+        />
+      )}
+
       <ShowdownBanner 
         isVisible={publicState.stage === "SHOWDOWN"} 
         won={publicState.winners?.includes("p1") || false}
-        handName={evaluations["p1"]?.description || ""}
+        handName={evaluations[publicState.winners?.[0] || "p1"]?.description || ""}
       />
 
       {/* Advice card */}
@@ -531,7 +679,7 @@ export const GameController: React.FC = () => {
         <PokerTable pot={publicState.pot}>
           <CommunityCards 
             cards={publicState.communityCards} 
-            highlightedCards={Object.values(evaluations).flatMap(e => e.best5)}
+            highlightedCards={Object.values(evaluations).flatMap(e => e.highlightCards)}
           />
 
           {publicState.players.map((p, idx) => {
@@ -539,6 +687,21 @@ export const GameController: React.FC = () => {
             const evaluation = evaluations[p.id];
             const posLabel = getPositionLabel(idx, publicState.dealerIndex, publicState.players.length);
             
+            // Calculate persistent street action
+            let displayAction: string | undefined = undefined;
+            const currentStreetActions = (gameState?.actionLog || []).filter(a => a.street === gameState?.stage);
+            const lastRaiseIndex = [...currentStreetActions].reverse().findIndex(a => a.type === 'RAISE');
+            const actualLastRaiseIndex = lastRaiseIndex === -1 ? 0 : currentStreetActions.length - 1 - lastRaiseIndex;
+            
+            const relevantActions = currentStreetActions.slice(actualLastRaiseIndex);
+            const playerLastAction = [...relevantActions].reverse().find(a => a.playerId === p.id);
+            
+            if (playerLastAction) {
+              if (playerLastAction.type === 'CHECK') displayAction = 'CHECK';
+              if (playerLastAction.type === 'CALL') displayAction = 'CALL';
+              if (playerLastAction.type === 'RAISE') displayAction = `RAISE ${playerLastAction.amount}`;
+            }
+
             return (
               <PlayerSeat
                 key={p.id}
@@ -552,10 +715,13 @@ export const GameController: React.FC = () => {
                 holeCards={p.holeCards}
                 isCurrentPlayer={p.id === "p1" || publicState.stage === "SHOWDOWN"}
                 currentBet={p.currentBet}
+                totalBet={p.totalBet}
                 isFolded={p.isFolded}
-                avatar={p.id === "p1" ? undefined : opponentAvatar}
-                lastAction={publicState.lastAction?.playerId === p.id ? publicState.lastAction.type : undefined}
-                highlightedCards={evaluation?.best5}
+                avatar={p.id === "p1" ? undefined : OPPONENT_AVATARS[p.difficulty || 'medium']}
+                lastAction={displayAction}
+                highlightedCards={evaluation?.highlightCards}
+                onInspect={() => setInspectedBotId(p.id)}
+                flicker={flickerSeatIndex === idx}
               />
             );
           })}
@@ -567,11 +733,12 @@ export const GameController: React.FC = () => {
         onAction={onPlayerAction}
         canCheck={canCheck}
         canCall={callAmount > 0}
-        canRaise={player.stack > (activeSettings?.creditMode ? activeSettings?.creditLimit : 0)}
+        canRaise={player.stack > callAmount}
         callAmount={callAmount}
         minRaise={minRaise}
         maxRaise={maxRaise}
         pot={publicState.pot}
+        heroBalance={player.stack}
         handStrengthLabel={handResult?.description}
         disabled={!isPlayerTurn}
         isBotThinking={isBotThinking && publicState.stage !== "SHOWDOWN"}

@@ -9,11 +9,13 @@ export function handleAction(
   const activePlayer = state.players[state.activePlayerIndex];
   const numPlayers = state.players.length;
 
+  const actionWithStreet = { ...action, street: state.stage };
+
   let nextState = { 
     ...state, 
     players: state.players.map(p => ({ ...p })),
-    lastAction: action,
-    actionLog: [...(state.actionLog || []), action]
+    lastAction: actionWithStreet,
+    actionLog: [...(state.actionLog || []), actionWithStreet]
   };
   let playerUpdate = nextState.players[state.activePlayerIndex];
   playerUpdate.hasActed = true;
@@ -40,6 +42,10 @@ export function handleAction(
       playerUpdate.totalBet += actualCall;
       playerUpdate.stack -= actualCall;
       nextState.pot += actualCall;
+
+      if (playerUpdate.stack <= (creditMode ? creditLimit : 0)) {
+        playerUpdate.isAllIn = true;
+      }
       break;
 
     case 'RAISE':
@@ -53,7 +59,7 @@ export function handleAction(
       
       if (actualRaise <= currentMaxBet && availableToRaise > 0) {
         // This case is actually a CALL if the stack allows it, but let's be strict
-        throw new Error('Raise must be greater than current bet');
+        throw new Error(`Raise must be greater than current bet. Actual raise: ${actualRaise}, Current max bet: ${currentMaxBet}`);
       }
       
       nextState.lastRaiseAmount = Math.max(0, actualRaise - currentMaxBet);
@@ -61,11 +67,14 @@ export function handleAction(
       playerUpdate.totalBet += raiseRequired;
       playerUpdate.stack -= raiseRequired;
       nextState.pot += raiseRequired;
+
+      if (playerUpdate.stack <= (creditMode ? creditLimit : 0)) {
+        playerUpdate.isAllIn = true;
+      }
       
-      // All other non-folded players must act again if they have chips
-      // Standard rule: only a full raise re-opens the betting, but user asked for 'make it so people must call the max amount seen'
+      // All other non-folded players must act again if they have chips and aren't all-in
       nextState.players.forEach((p, i) => {
-        if (i !== state.activePlayerIndex && !p.isFolded && p.stack > (creditMode ? creditLimit : 0)) {
+        if (i !== state.activePlayerIndex && !p.isFolded && !p.isAllIn && p.stack > (creditMode ? creditLimit : 0)) {
           p.hasActed = false;
         }
       });
@@ -81,11 +90,11 @@ export function handleAction(
   }
 
   // Check if round is over
-  const allActed = nextState.players.every(p => p.isFolded || p.hasActed || p.stack <= (creditMode ? creditLimit : 0));
+  const allActed = nextState.players.every(p => p.isFolded || p.hasActed || p.isAllIn);
   const maxBet = Math.max(...nextState.players.map(p => p.currentBet));
   const betsMatched = nextState.players.every(p => 
     p.isFolded || 
-    p.stack <= (creditMode ? creditLimit : 0) || 
+    p.isAllIn || 
     p.currentBet === maxBet
   );
 
@@ -111,11 +120,12 @@ function getNextToAct(state: GameState, currentIndex: number, creditMode: boolea
     const nextIndex = (currentIndex + i) % numPlayers;
     const p = state.players[nextIndex];
     
-    // Player can act if they haven't folded, have credit, and:
+    // Player can act if they haven't folded, aren't all-in, and:
     // 1. Haven't acted this round OR
     // 2. Haven't matched the current max bet
-    const hasCredit = p.stack > (creditMode ? creditLimit : 0);
-    if (!p.isFolded && hasCredit && (!p.hasActed || p.currentBet < maxBet)) {
+    const floor = creditMode ? creditLimit : 0;
+    const hasChips = p.stack > floor;
+    if (!p.isFolded && !p.isAllIn && hasChips && (!p.hasActed || p.currentBet < maxBet)) {
       return nextIndex;
     }
   }

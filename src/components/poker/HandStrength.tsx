@@ -14,7 +14,7 @@ export const HandStrength: React.FC<HandStrengthProps> = ({ holeCards, community
   
   return (
     <div className="bg-black/40 px-3 py-1 pixel-border border border-white/20 text-[10px] uppercase text-white font-bold">
-      {result.name}
+      {result.description}
     </div>
   );
 };

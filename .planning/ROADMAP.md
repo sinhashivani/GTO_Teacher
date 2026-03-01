@@ -66,8 +66,11 @@ Plans:
 Plans:
 - [x] 07-01-PLAN.md — Hand Evaluation & Settlement Implementation [PH7-ENGINE, PH7-UI]
 
-### Phase 9: Learning & Bankroll Features
+### Phase 8: Gameplay Correctness & Post-Hand UX
+**Goal:** Fix core gameplay correctness (chip flow, showdown logic) and enhance post-hand UX (winner clarity, hand rankings UX, end of round report).
+**Status:** COMPLETE
 
+### Phase 9: Learning & Bankroll Features
 **Goal:** Add advanced bankroll controls, Credit Mode, and expanded structured GTO coaching.
 **Status:** COMPLETE
 
@@ -75,3 +78,13 @@ Plans:
 - [x] 09-01-PLAN.md — Bankroll Controls & Credit Mode [PH9-BANKROLL]
 - [x] 09-02-PLAN.md — Expanded GTO Coaching & Glossary [PH9-COACH]
 - [x] 09-03-PLAN.md — Security Hardening & Stable Settings [PH9-SECURITY]
+
+### Phase 10: Table Positions, Advanced Analysis, Rotation
+**Goal:** Implement formal table positions, advanced GTO metrics, dealer rotation, and dynamic bot environments.
+**Status:** COMPLETE
+
+Plans:
+- [x] 10-01-PLAN.md — Table Position Mapping & Rotation [PH10-ROTATION]
+- [x] 10-02-PLAN.md — Position UI & Secure Card Reveal [PH10-UI]
+- [x] 10-03-PLAN.md — Advanced GTO Metrics & Persistence [PH10-ANALYSIS]
+- [x] 10-04-PLAN.md — Bot Performance Analysis & Dynamic Rotation [PH10-BOTS]

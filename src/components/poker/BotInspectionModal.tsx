@@ -1,15 +1,16 @@
+"use client";
+
 import React from "react";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Card as CardType } from "@/lib/poker/types";
 import { CardView } from "./CardView";
-import { BotDifficulty } from "@/lib/poker/bot";
-import { cn } from "@/lib/utils";
+import { Card } from "@/lib/poker/types";
 
 export interface BotPerformanceAction {
   type: string;
@@ -18,118 +19,125 @@ export interface BotPerformanceAction {
   timestamp: number;
 }
 
-export interface BotMetadata {
-  id: string;
-  name: string;
-  avatar: string;
-  difficulty: BotDifficulty;
-  playStyle: string;
-  recentActions: BotPerformanceAction[];
-  holeCards?: CardType[];
-}
-
 interface BotInspectionModalProps {
-  bot: BotMetadata | null;
   isOpen: boolean;
-  onOpenChange: (open: boolean) => void;
+  onClose: () => void;
+  bot: {
+    id: string;
+    name: string;
+    difficulty: string;
+    avatar?: string;
+    holeCards?: Card[];
+  };
+  performance: BotPerformanceAction[];
   heroFolded: boolean;
 }
 
+const DIFFICULTY_LABELS: Record<string, string> = {
+  easy: "Novice",
+  medium: "Intermediate",
+  expert: "Master",
+};
+
 const STYLE_DESCRIPTIONS: Record<string, string> = {
-  easy: "Loose and unpredictable. This player loves to see flops and will often chase draws regardless of the price. Prone to 'curiosity' calls.",
-  medium: "Solid but predictable. Plays a tight-passive game. They know hand rankings but lack the aggression to maximize value or bluff effectively.",
-  expert: "Balanced and calculated. Uses pot odds and positional awareness. Capable of both thin value bets and well-timed bluffs.",
+  easy: "Loose and unpredictable. Often calls with weak hands and makes erratic bets. Susceptible to bluffs but can stumble into big pots.",
+  medium: "Solid and cautious. Plays a standard TAG (Tight-Aggressive) style but lacks advanced deception. Respects big bets.",
+  expert: "Balanced and aggressive. Uses pot odds and range balancing. Difficult to exploit and capable of timely bluffs.",
 };
 
 export const BotInspectionModal: React.FC<BotInspectionModalProps> = ({
-  bot,
   isOpen,
-  onOpenChange,
+  onClose,
+  bot,
+  performance,
   heroFolded,
 }) => {
-  if (!bot) return null;
-
-  const showCards = heroFolded || false;
+  const showCards = heroFolded || bot.holeCards?.length === 0; // If they are revealed anyway at showdown
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="bg-tavern-dark border-2 border-tavern-wood text-tavern-parchment font-pixel sm:max-w-[425px]">
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="bg-tavern-dark border-2 border-tavern-wood text-tavern-gold font-pixel max-w-md">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-3 text-tavern-gold uppercase tracking-widest text-lg">
-            <span className="text-2xl">{bot.avatar}</span>
+          <DialogTitle className="text-xl flex items-center gap-2">
+            <span className="text-2xl">{bot.avatar || "👤"}</span>
             {bot.name}
           </DialogTitle>
+          <DialogDescription className="text-tavern-tan/80 text-[10px] uppercase">
+            Bot Inspection & Analysis
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <div className="space-y-6 mt-4">
           {/* Metadata Section */}
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <span className="text-[10px] uppercase text-tavern-gold/60">Expertise</span>
-              <Badge className={cn(
-                "uppercase text-[9px]",
-                bot.difficulty === 'expert' ? "bg-red-900 text-red-100" :
-                bot.difficulty === 'medium' ? "bg-blue-900 text-blue-100" :
-                "bg-green-900 text-green-100"
-              )}>
-                {bot.difficulty}
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-[10px] text-tavern-tan uppercase mb-1">Skill Level</p>
+              <Badge variant="outline" className="border-tavern-gold text-tavern-gold text-[10px]">
+                {DIFFICULTY_LABELS[bot.difficulty] || bot.difficulty}
               </Badge>
             </div>
-            <p className="text-[11px] leading-relaxed italic border-l-2 border-tavern-gold/20 pl-3 py-1">
-              "{STYLE_DESCRIPTIONS[bot.difficulty as string] || STYLE_DESCRIPTIONS.medium}"
+            <div className="text-right">
+              <p className="text-[10px] text-tavern-tan uppercase mb-1">Status</p>
+              <Badge variant="outline" className="border-green-500 text-green-500 text-[10px]">
+                Active
+              </Badge>
+            </div>
+          </div>
+
+          {/* Description */}
+          <div className="bg-tavern-wood/20 p-3 rounded border border-tavern-wood/30">
+            <p className="text-[10px] text-tavern-tan uppercase mb-2">Play Style</p>
+            <p className="text-xs leading-relaxed">
+              {STYLE_DESCRIPTIONS[bot.difficulty] || "A mysterious player with unknown tendencies."}
             </p>
           </div>
 
-          {/* Hole Cards Reveal */}
-          <div className="p-4 bg-black/40 border border-tavern-wood/30 rounded-lg">
-            <h3 className="text-[10px] uppercase text-tavern-gold mb-3 text-center">Current Hand</h3>
-            <div className="flex justify-center gap-3">
-              {bot.holeCards && showCards ? (
-                bot.holeCards.map((card, idx) => (
-                  <CardView key={idx} card={card} className="w-14 h-20" />
-                ))
-              ) : (
-                <>
-                  <div className="w-14 h-20 bg-tavern-wood/20 border-2 border-dashed border-tavern-gold/20 flex items-center justify-center">
-                    <span className="text-[8px] text-center px-1 opacity-40 uppercase">Fold to reveal</span>
-                  </div>
-                  <div className="w-14 h-20 bg-tavern-wood/20 border-2 border-dashed border-tavern-gold/20 flex items-center justify-center">
-                    <span className="text-[8px] text-center px-1 opacity-40 uppercase">Fold to reveal</span>
-                  </div>
-                </>
-              )}
-            </div>
-            {!showCards && (
-              <p className="text-[9px] text-center mt-3 text-tavern-gold/40 uppercase">
-                Privacy Rule: Hero must fold to see bot cards.
-              </p>
+          {/* Hole Cards - ONLY IF HERO FOLDED */}
+          <div className="bg-tavern-wood/10 p-3 rounded border border-tavern-wood/20">
+            <p className="text-[10px] text-tavern-tan uppercase mb-2">Current Hole Cards</p>
+            {showCards && bot.holeCards && bot.holeCards.length === 2 ? (
+              <div className="flex gap-2">
+                <CardView card={bot.holeCards[0]} className="w-8 h-12" />
+                <CardView card={bot.holeCards[1]} className="w-8 h-12" />
+                <div className="ml-2 flex items-center">
+                   <p className="text-[8px] text-green-400 italic">Revealed: Hero Folded</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <div className="w-8 h-12 bg-tavern-wood/40 rounded border border-tavern-wood/60 flex items-center justify-center">
+                  <span className="text-tavern-gold/30">?</span>
+                </div>
+                <div className="w-8 h-12 bg-tavern-wood/40 rounded border border-tavern-wood/60 flex items-center justify-center">
+                  <span className="text-tavern-gold/30">?</span>
+                </div>
+                <div className="ml-2 flex items-center">
+                   <p className="text-[8px] text-tavern-tan italic">Cards hidden while Hero in hand</p>
+                </div>
+              </div>
             )}
           </div>
 
           {/* Recent Performance */}
-          <div className="space-y-3">
-            <h3 className="text-[10px] uppercase text-tavern-gold border-b border-tavern-gold/20 pb-1">Recent Tendencies</h3>
+          <div>
+            <p className="text-[10px] text-tavern-tan uppercase mb-2">Recent Actions</p>
             <div className="space-y-2">
-              {bot.recentActions.length > 0 ? (
-                bot.recentActions.map((action, idx) => (
-                  <div key={idx} className="flex justify-between items-center text-[10px] p-2 bg-tavern-wood/10 border border-tavern-wood/20">
-                    <div className="flex flex-col">
-                      <span className="uppercase font-bold text-tavern-gold">{action.type}</span>
-                      <span className="text-[8px] opacity-60 uppercase">{action.stage}</span>
+              {performance.length > 0 ? (
+                performance.map((act, i) => (
+                  <div key={i} className="flex items-center justify-between text-[10px] border-b border-tavern-wood/10 pb-1">
+                    <div className="flex gap-2">
+                      <span className="text-tavern-tan/60">[{act.stage}]</span>
+                      <span className="uppercase font-bold">{act.type}</span>
                     </div>
-                    {action.isCharacteristic ? (
-                      <Badge variant="outline" className="text-[7px] border-tavern-gold/40 text-tavern-gold uppercase h-4 px-1">
-                        Typical
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-[7px] border-tavern-parchment/40 text-tavern-parchment/60 uppercase h-4 px-1">
-                        Outlier
-                      </Badge>
+                    {act.isCharacteristic && (
+                       <Badge variant="outline" className="bg-blue-900/20 border-blue-500/50 text-blue-400 text-[8px] h-4">
+                         Characteristic
+                       </Badge>
                     )}
                   </div>
                 ))
               ) : (
-                <p className="text-[9px] text-center py-4 opacity-40 uppercase italic">No data yet this session</p>
+                <p className="text-[10px] italic text-tavern-tan/60">No recent actions tracked.</p>
               )}
             </div>
           </div>

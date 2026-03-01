@@ -22,6 +22,7 @@ export interface HandResult {
   handClass: HandCategory;
   classRank: number;
   best5: Card[];
+  highlightCards: Card[]; // Only the cards that make the rank (no kickers)
   tiebreak: number[];
   handValue: number[]; // comparable tuple: [classRank, ...tiebreak]
   description: string;
@@ -35,6 +36,7 @@ export interface Action {
   playerId: string;
   type: ActionType;
   amount?: number;
+  street?: GameStage;
   scores?: Partial<Record<ActionType, number>>;
   deviation?: {
     recommended: ActionType;
@@ -65,8 +67,12 @@ export interface Player {
   totalBet: number; // Total chips contributed to the pot in this hand
   hasActed: boolean;
   isFolded: boolean;
+  isAllIn: boolean;
   position?: Position;
   difficulty?: string; // For bot quit logic
+  isEmpty?: boolean;
+  initialStack?: number;
+  thresholdType?: 'broke' | 'target_1k' | 'profit_200';
 }
 
 export interface GameState {

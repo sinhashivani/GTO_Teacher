@@ -16,10 +16,13 @@ interface PlayerSeatProps {
   holeCards?: CardType[];
   isCurrentPlayer?: boolean;
   currentBet?: number;
+  totalBet?: number;
   isFolded?: boolean;
   avatar?: string;
   lastAction?: string;
   highlightedCards?: CardType[];
+  onInspect?: () => void;
+  flicker?: boolean;
 }
 
 const positionMap = {
@@ -46,10 +49,13 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
   holeCards,
   isCurrentPlayer,
   currentBet,
+  totalBet,
   isFolded,
   avatar,
   lastAction,
   highlightedCards = [],
+  onInspect,
+  flicker,
 }) => {
   const isBottom = position === "bottom";
 
@@ -82,12 +88,15 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
 
         {/* Seat card */}
         <div
+          onClick={() => !isCurrentPlayer && onInspect?.()}
           className={cn(
             "relative flex flex-col items-center gap-1 px-3 py-2 bg-tavern-dark/90 border-2 min-w-[120px] transition-all duration-300",
             isActive
               ? "border-tavern-gold gold-glow"
               : "border-tavern-wood/60",
-            isFolded && "opacity-40"
+            isFolded && "opacity-40",
+            !isCurrentPlayer && "cursor-pointer hover:border-tavern-gold/60",
+            flicker && "animate-pulse brightness-150 shadow-[0_0_20px_rgba(251,191,36,0.5)]"
           )}
           style={isActive ? { animation: "gold-pulse 2s ease-in-out infinite" } : {}}
         >
@@ -108,10 +117,17 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
             </span>
           </div>
 
-          {/* Chips */}
-          <span className="text-[10px] text-tavern-gold">
-            {chips.toLocaleString()}
-          </span>
+          {/* Chips and Total Bet */}
+          <div className="flex flex-col items-center">
+            <span className="text-[10px] text-tavern-gold">
+              {chips.toLocaleString()}
+            </span>
+            {totalBet !== undefined && totalBet > 0 && (
+              <span className="text-[7px] text-tavern-parchment/40 uppercase tracking-tighter">
+                Total Put In: {totalBet}
+              </span>
+            )}
+          </div>
 
           {/* Current bet indicator */}
           {currentBet !== undefined && currentBet > 0 && (

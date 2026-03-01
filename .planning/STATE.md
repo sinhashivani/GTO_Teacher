@@ -1,10 +1,17 @@
 # Project State: GTO Teacher
 
-## Current Phase: Phase 9 Complete
-- **Status**: Phase 9 (Learning & Bankroll) complete. Engine hardened, coaching expanded.
+## Current Phase: Phase 10 Complete
+- **Status**: Phase 10 (Table Positions, Advanced Analysis, Rotation) complete.
 - **Goal**: Final polish and delivery.
 
 ## Recent Updates
+- **Phase 10 (Advanced Rotation & Analysis) Completed**:
+  - Implemented formal table positions (BTN, SB, BB, UTG, HJ, CO) for 2-6 players.
+  - Added dealer rotation hand-over-hand in `GameController`.
+  - Implemented Secure Card Reveal: Opponent hole cards are shown if Hero folds.
+  - Added Advanced GTO Metrics: Action scores, EV Delta, and identified Leaks (e.g., "Over-folding on PREFLOP").
+  - Implemented Dynamic Bot Rotation: Bots leave the table at credit thresholds and are refilled after 1-3 hands.
+  - Created Bot Inspection Modal showing skill profile, play style, and last 5 "characteristic" actions.
 - **Phase 9 (Learning & Bankroll) Completed**:
   - Implemented Bankroll Resets and custom Starting Stacks.
   - Added "Credit Mode" for negative betting down to configurable limits.
@@ -28,5 +35,8 @@
 ## Quick Tasks Completed
 | Task | Date | Status |
 |------|------|--------|
+| Persistent Actions & Enhanced Winner Reporting (Multi-player support, Winning card lists) | 2026-02-27 | DONE |
+| Proportional Raise Amounts (1/3, 1/2, 2/3, POT presets) | 2026-02-27 | DONE |
+| NPC & Betting Overhaul (30 NPCs, Exit Thresholds, Strict Limits, Slider Fix) | 2026-02-27 | DONE |
 | Gameplay correctness & Post-hand UX polish | 2026-02-26 | DONE |
 | All-in Logic & Expandable GTO Feedback | 2026-02-26 | DONE |

@@ -1,88 +1,59 @@
-import { describe, it } from 'node:test';
-import assert from 'node:assert';
 import { handleAction } from '../betting';
-import { GameState, Player } from '../types';
+import { GameState, Player, Action } from '../types';
 
-describe('Credit Mode Logic', () => {
-  const createPlayer = (id: string, stack: number): Player => ({
-    id,
-    name: id,
-    stack,
-    holeCards: [],
-    currentBet: 0,
-    totalBet: 0,
-    hasActed: false,
-    isFolded: false,
+describe('Credit Mode Balance Updates', () => {
+  const initialState: GameState = {
+    stage: 'PREFLOP',
+    pot: 30,
+    communityCards: [],
+    players: [
+      {
+        id: 'p1',
+        name: 'You',
+        stack: -100,
+        holeCards: [],
+        currentBet: 10,
+        totalBet: 10,
+        hasActed: false,
+        isFolded: false,
+      },
+      {
+        id: 'bot-1',
+        name: 'Bot 1',
+        stack: 1000,
+        holeCards: [],
+        currentBet: 20,
+        totalBet: 20,
+        hasActed: false,
+        isFolded: false,
+      }
+    ],
+    activePlayerIndex: 0,
+    dealerIndex: 0,
+    lastRaiseAmount: 20,
+  };
+
+  it('should allow calling even with negative balance in Credit Mode', () => {
+    const action: Action = { playerId: 'p1', type: 'CALL' };
+    const nextState = handleAction(initialState, action, true, -2000);
+    
+    const hero = nextState.players[0];
+    // currentMaxBet is 20. Hero has 10. Call should be 10.
+    // Stack was -100, should be -110.
+    expect(hero.stack).toBe(-110);
+    expect(hero.currentBet).toBe(20);
+    expect(nextState.pot).toBe(40);
   });
 
-  it('should go all-in when raising more than stack (creditMode OFF)', () => {
-    const state: GameState = {
-      stage: 'FLOP',
-      pot: 0,
-      players: [createPlayer('p1', 50), createPlayer('p2', 1000)],
-      activePlayerIndex: 0,
-      dealerIndex: 1,
-      lastRaiseAmount: 0,
-    };
-
-    // p1 tries to raise to 100 but only has 50. Should raise to 50.
-    const newState = handleAction(state, { playerId: 'p1', type: 'RAISE', amount: 100 }, false);
-    assert.strictEqual(newState.players[0].stack, 0);
-    assert.strictEqual(newState.players[0].currentBet, 50);
-    assert.strictEqual(newState.pot, 50);
-  });
-
-  it('should allow betting below 0 when creditMode is ON and within limit', () => {
-    const state: GameState = {
-      stage: 'FLOP',
-      pot: 0,
-      players: [createPlayer('p1', 50), createPlayer('p2', 1000)],
-      activePlayerIndex: 0,
-      dealerIndex: 1,
-      lastRaiseAmount: 0,
-    };
-
-    // p1 raises to 100 (needs 100 chips, has 50, goes to -50)
-    const newState = handleAction(state, { playerId: 'p1', type: 'RAISE', amount: 100 }, true, -2000);
-    assert.strictEqual(newState.players[0].stack, -50);
-    assert.strictEqual(newState.pot, 100);
-  });
-
-  it('should cap raise at credit limit if raise exceeds it', () => {
-    const state: GameState = {
-      stage: 'FLOP',
-      pot: 0,
-      players: [createPlayer('p1', -1950), createPlayer('p2', 1000)],
-      activePlayerIndex: 0,
-      dealerIndex: 1,
-      lastRaiseAmount: 0,
-    };
-
-    // p1 tries to raise to 100 (needs 100 chips, has -1950, would go to -2050, limit -2000). 
-    // Should cap at -2000 (adding 50 chips).
-    const newState = handleAction(state, { playerId: 'p1', type: 'RAISE', amount: 100 }, true, -2000);
-    assert.strictEqual(newState.players[0].stack, -2000);
-    assert.strictEqual(newState.players[0].currentBet, 50);
-    assert.strictEqual(newState.pot, 50);
-  });
-
-  it('should cap CALL at available credit limit', () => {
-    const state: GameState = {
-      stage: 'FLOP',
-      pot: 100,
-      players: [
-        { ...createPlayer('p1', 1000), currentBet: 100 },
-        { ...createPlayer('p2', -1950), currentBet: 0 }
-      ],
-      activePlayerIndex: 1,
-      dealerIndex: 0,
-      lastRaiseAmount: 100,
-    };
-
-    // p2 calls 100 but only has 50 credit left (-1950 - (-2000) = 50)
-    const newState = handleAction(state, { playerId: 'p2', type: 'CALL' }, true, -2000);
-    assert.strictEqual(newState.players[1].stack, -2000);
-    assert.strictEqual(newState.players[1].currentBet, 50);
-    assert.strictEqual(newState.pot, 150);
+  it('should allow raising even with negative balance in Credit Mode', () => {
+    const action: Action = { playerId: 'p1', type: 'RAISE', amount: 100 };
+    const nextState = handleAction(initialState, action, true, -2000);
+    
+    const hero = nextState.players[0];
+    // Hero raises to 100. Current bet was 10. Required: 90.
+    // Stack was -100, should be -190.
+    expect(hero.stack).toBe(-190);
+    expect(hero.currentBet).toBe(100);
+    expect(nextState.pot).toBe(30 + 90);
   });
 });

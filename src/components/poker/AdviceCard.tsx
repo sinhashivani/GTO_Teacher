@@ -59,7 +59,7 @@ export const AdviceCard: React.FC<AdviceCardProps> = ({
         }}
         exit={{ x: 60, opacity: 0 }}
         transition={{ type: "spring", damping: 20, stiffness: 300 }}
-        className="fixed top-16 right-4 z-50 shadow-2xl"
+        className="fixed top-24 right-4 z-[100] shadow-2xl"
       >
         <div
           className={cn(
