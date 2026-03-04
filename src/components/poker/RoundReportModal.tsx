@@ -11,7 +11,7 @@ import { GameState, HandResult } from "@/lib/poker/types";
 import { CardView } from "./CardView";
 import { cn } from "@/lib/utils";
 import { determineWinners } from "@/lib/poker/evaluator";
-import { updateBankroll } from "@/lib/poker/bankroll";
+import { updateBankroll, setBankroll } from "@/lib/poker/bankroll";
 
 import { ChevronLeft, ChevronRight, BookOpen, Info, RotateCcw } from "lucide-react";
 import { GlossaryDialog } from "./GlossaryDialog";
@@ -34,7 +34,7 @@ export const RoundReportModal: React.FC<RoundReportModalProps> = ({
   const [highlightTerm, setHighlightTerm] = React.useState("");
 
   const handleReset = async () => {
-    updateBankroll("p1", 1000);
+    setBankroll("p1", 1000);
     onClose();
   };
 

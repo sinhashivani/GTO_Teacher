@@ -100,7 +100,7 @@ export const GameController: React.FC = () => {
   const [inspectedBotId, setInspectedBotId] = useState<string | null>(null);
   const [botPerformance, setBotPerformance] = useState<Record<string, BotPerformanceAction[]>>({});
   const [flickerSeatIndex, setFlickerSeatIndex] = useState<number | null>(null);
-  const [sessionPlayers, setSessionPlayers] = useState<{id: string, name: string, difficulty?: string, isEmpty?: boolean, initialStack?: number, thresholdType?: string}[]>([]);
+  const [sessionPlayers, setSessionPlayers] = useState<{id: string, name: string, difficulty?: string, isEmpty?: boolean, handsNegative?: number, initialStack?: number, thresholdType?: string}[]>([]);
   const sessionPlayersRef = useRef(sessionPlayers);
   const gameStateRef = useRef(gameState);
 
@@ -175,17 +175,24 @@ export const GameController: React.FC = () => {
           for (let i = 1; i < count; i++) {
             const botDiff = diff === 'mixed' ? (['easy', 'medium', 'expert'][i % 3] as BotDifficulty) : diff as BotDifficulty;
             const npc = BotAI.getRandomNPC(botDiff, players.map(p => p.name));
+            const botId = `bot-seat-${i}`;
+            // Sample variety stack 300 - 15000
+            const sampledStack = Math.floor(Math.random() * (15000 - 300 + 1)) + 300;
+            
             players.push({
-              id: `bot-seat-${i}`,
+              id: botId,
               name: npc.name,
               difficulty: npc.difficulty,
               thresholdType: npc.thresholdType,
-              initialStack: currentSettings?.startingStack || 1000,
-              isEmpty: false
+              initialStack: sampledStack,
+              isEmpty: false,
+              handsNegative: 0
             });
-            // Ensure bankroll is set for this NPC
-            setBankroll(`bot-seat-${i}`, currentSettings?.startingStack || 1000);
+            // Ensure bankroll is set/persisted for this session bot
+            setBankroll(botId, sampledStack);
           }
+          // Load hero bankroll
+          players[0].initialStack = getBankroll("p1", currentSettings?.startingStack || 1000);
         } else {
           // Process pending refills
           pendingRefills.current = pendingRefills.current.map(refill => ({
@@ -206,7 +213,10 @@ export const GameController: React.FC = () => {
                 return p;
               }
               
-              if (BotAI.shouldBotExit(finishedPlayer)) {
+              const updatedHandsNegative = finishedPlayer.stack < 0 ? (p.handsNegative || 0) + 1 : 0;
+              const playerWithStats = { ...p, stack: finishedPlayer.stack, handsNegative: updatedHandsNegative };
+
+              if (BotAI.shouldBotExit(playerWithStats as Player)) {
                 // Heads-up: Replace immediately with flicker
                 if (count === 2) {
                   const botDiff = diff === 'mixed' ? 'medium' : diff as BotDifficulty;
@@ -227,7 +237,8 @@ export const GameController: React.FC = () => {
                     difficulty: npc.difficulty,
                     thresholdType: npc.thresholdType,
                     initialStack: randomStack,
-                    isEmpty: false
+                    isEmpty: false,
+                    handsNegative: 0
                   };
                 }
                 
@@ -235,6 +246,7 @@ export const GameController: React.FC = () => {
                 return { ...p, isEmpty: true };
               }
               p.initialStack = finishedPlayer.stack; 
+              p.handsNegative = updatedHandsNegative;
               return p;
             });
           }
@@ -247,16 +259,19 @@ export const GameController: React.FC = () => {
             const npc = BotAI.getRandomNPC(botDiff as BotDifficulty, players.map(p => p.name));
             
             const botId = `bot-seat-${idx}`;
+            // Sample variety stack 300 - 15000
+            const sampledStack = Math.floor(Math.random() * (15000 - 300 + 1)) + 300;
+            setBankroll(botId, sampledStack);
+
             players[idx] = {
               id: botId, 
               name: npc.name,
               difficulty: npc.difficulty,
               thresholdType: npc.thresholdType,
-              initialStack: currentSettings?.startingStack || 1000,
-              isEmpty: false
+              initialStack: sampledStack,
+              isEmpty: false,
+              handsNegative: 0
             };
-            // Reset bankroll for the new NPC
-            setBankroll(botId, currentSettings?.startingStack || 1000);
           });
         }
 
@@ -621,8 +636,8 @@ export const GameController: React.FC = () => {
           isOpen={showReport} 
           onClose={() => {
             setShowReport(false);
-            // If balance was 0, reload to apply reset
-            if (player.stack <= 0) {
+            // If balance was negative, reload to apply reset (handled by modal)
+            if (player.stack < 0) {
               window.location.reload();
             }
           }} 
@@ -739,6 +754,8 @@ export const GameController: React.FC = () => {
         maxRaise={maxRaise}
         pot={publicState.pot}
         heroBalance={player.stack}
+        isHeroFolded={player.isFolded}
+        isHeroAllIn={player.isAllIn}
         handStrengthLabel={handResult?.description}
         disabled={!isPlayerTurn}
         isBotThinking={isBotThinking && publicState.stage !== "SHOWDOWN"}

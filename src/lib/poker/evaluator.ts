@@ -230,16 +230,16 @@ export function evaluate7(cards: Card[]): HandResult {
   }
 
   // 9. High Card
-  const kickers = getKickers([], 5);
   const best5 = getKickerCards([], 5);
+  const best5Ranks = best5.map(c => rankToValue[c.rank]);
   return {
     handClass: 'High Card',
     classRank: CLASS_RANKS['High Card'],
     best5,
     highlightCards: [best5[0]], // Only the high card
-    tiebreak: kickers,
-    handValue: [CLASS_RANKS['High Card'], ...kickers],
-    description: `${valueToName[kickers[0]]} High Card`
+    tiebreak: best5Ranks,
+    handValue: [CLASS_RANKS['High Card'], ...best5Ranks],
+    description: `${valueToName[best5Ranks[0]]} High Card`
   };
 }
 

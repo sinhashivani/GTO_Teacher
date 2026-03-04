@@ -63,11 +63,16 @@ export class BotAI {
     const initialStack = player.initialStack || 1000;
     const thresholdType = player.thresholdType || 'broke';
 
+    // 1 round grace logic: if they can't get positive after 1 round, force them out
+    if (stack < 0 && (player.handsNegative || 0) >= 1) {
+      return true;
+    }
+
     switch (thresholdType) {
       case 'broke':
-        // Default broke limit
+        // Default broke limit: exit immediately if they hit their absolute credit limit
         const limit = this.getCreditLimit(player.difficulty as BotDifficulty || 'medium');
-        return stack <= limit || stack <= 0; // prompt mentioned 0 money
+        return stack <= limit; 
       case 'target_1k':
         return stack >= 1000;
       case 'profit_200':

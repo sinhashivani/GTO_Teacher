@@ -119,12 +119,12 @@ export const PlayerSeat: React.FC<PlayerSeatProps> = ({
 
           {/* Chips and Total Bet */}
           <div className="flex flex-col items-center">
-            <span className="text-[10px] text-tavern-gold">
+            <span className="text-[10px] text-tavern-gold font-bold">
               {chips.toLocaleString()}
             </span>
             {totalBet !== undefined && totalBet > 0 && (
               <span className="text-[7px] text-tavern-parchment/40 uppercase tracking-tighter">
-                Total Put In: {totalBet}
+                Total: {totalBet}
               </span>
             )}
           </div>

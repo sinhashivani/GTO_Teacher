@@ -16,6 +16,8 @@ interface ActionBarProps {
   maxRaise: number;
   pot: number;
   heroBalance: number;
+  isHeroFolded?: boolean;
+  isHeroAllIn?: boolean;
   handStrengthLabel?: string;
   disabled?: boolean;
   isBotThinking?: boolean;
@@ -35,6 +37,8 @@ export const ActionBar: React.FC<ActionBarProps> = ({
   maxRaise,
   pot,
   heroBalance,
+  isHeroFolded,
+  isHeroAllIn,
   handStrengthLabel,
   disabled,
   isBotThinking,
@@ -58,22 +62,29 @@ export const ActionBar: React.FC<ActionBarProps> = ({
     setBetAmount(defaultBet);
   }, [minRaise, maxRaise, pot]);
 
-  const handlePreset = (fraction: number | 'allin') => {
-    if (fraction === 'allin') {
+  const handlePreset = (fraction: number | 'allin' | 'bankroll', mode: 'pot' | 'bankroll' = 'pot') => {
+    if (fraction === 'allin' || fraction === 'bankroll') {
       setBetAmount(maxRaise);
       return;
     }
     
-    // Proportional to current pot
-    const amount = Math.floor(pot * fraction);
+    let amount = 0;
+    if (mode === 'bankroll') {
+      // fraction * stack + already put in
+      const heroInPot = maxRaise - heroBalance;
+      amount = Math.floor(heroBalance * fraction) + heroInPot;
+    } else {
+      amount = Math.floor(pot * fraction);
+    }
+
     // Clamp between min and max. If max < min, then max wins (all-in)
     const clamped = maxRaise <= minRaise ? maxRaise : Math.max(minRaise, Math.min(maxRaise, amount));
     setBetAmount(clamped);
   };
 
   const handleNextHand = () => {
-    // If balance is 0, must view report first
-    if (heroBalance <= 0) {
+    // If balance is negative, must view report then reset
+    if (heroBalance < 0) {
       if (onShowReport) onShowReport();
       return;
     }
@@ -111,7 +122,7 @@ export const ActionBar: React.FC<ActionBarProps> = ({
               onClick={handleNextHand}
               className="bg-tavern-gold text-tavern-dark px-8 py-3 text-[12px] font-bold uppercase tracking-widest hover:bg-tavern-gold-light transition-colors shadow-lg border-2 border-tavern-dark"
             >
-              { heroBalance <= 0 ? "Review to Continue" : "Next Hand" }
+              { heroBalance < 0 ? "Review to Reset" : "Next Hand" }
             </button>
           </div>
         </div>
@@ -126,27 +137,60 @@ export const ActionBar: React.FC<ActionBarProps> = ({
         </div>
       )}
 
+      {/* Hero state messages (Folded/All-in) */}
+      {!isShowdown && !isBotThinking && (isHeroFolded || isHeroAllIn) && (
+        <div className="flex justify-center py-4">
+          <span className="text-xs text-tavern-parchment/40 uppercase tracking-[0.2em] italic">
+            {isHeroFolded ? "You have folded this hand" : "You are All-In"}
+          </span>
+        </div>
+      )}
+
       {/* Action buttons + slider */}
-      {!isShowdown && !isBotThinking && (
+      {!isShowdown && !isBotThinking && !isHeroFolded && !isHeroAllIn && (
         <div className="flex flex-col gap-3">
           {/* Raise Presets */}
           {canRaise && (
-            <div className="flex justify-center gap-2 mb-1">
-              {[
-                { label: '1/2', val: 0.5 },
-                { label: '2x', val: 2 },
-                { label: '3x', val: 3 },
-                { label: 'MAX', val: 'allin' as const }
-              ].map(preset => (
-                <button
-                  key={preset.label}
-                  disabled={disabled}
-                  onClick={() => handlePreset(preset.val)}
-                  className="px-2 py-1 border border-tavern-gold/30 bg-black/20 text-[7px] uppercase text-tavern-gold/70 hover:bg-tavern-gold/10 hover:text-tavern-gold transition-colors cursor-pointer"
-                >
-                  {preset.label}
-                </button>
-              ))}
+            <div className="flex justify-center items-center gap-2 mb-1">
+              {/* Bankroll based */}
+              <div className="flex gap-1.5">
+                {[
+                  { label: '1/5', val: 0.2 },
+                  { label: '1/2', val: 0.5 },
+                  { label: '3/4', val: 0.75 },
+                  { label: 'ALL IN', val: 'allin' as const }
+                ].map(preset => (
+                  <button
+                    key={'br-'+preset.label}
+                    disabled={disabled}
+                    onClick={() => handlePreset(preset.val, 'bankroll')}
+                    className="px-2 py-1 border border-tavern-gold/20 bg-black/10 text-[6px] uppercase text-tavern-gold/50 hover:bg-tavern-gold/10 hover:text-tavern-gold transition-colors cursor-pointer"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="h-4 w-px bg-tavern-gold/20 mx-1" />
+
+              {/* Pot based */}
+              <div className="flex gap-1.5">
+                {[
+                  { label: '1/3', val: 0.33 },
+                  { label: '1/2', val: 0.5 },
+                  { label: '2/3', val: 0.66 },
+                  { label: 'POT', val: 1 }
+                ].map(preset => (
+                  <button
+                    key={'pot-'+preset.label}
+                    disabled={disabled}
+                    onClick={() => handlePreset(preset.val, 'pot')}
+                    className="px-2 py-1 border border-tavern-gold/20 bg-black/10 text-[6px] uppercase text-tavern-gold/50 hover:bg-tavern-gold/10 hover:text-tavern-gold transition-colors cursor-pointer"
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 

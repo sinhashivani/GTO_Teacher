@@ -35,7 +35,8 @@ export function handleAction(
 
     case 'CALL':
       const callAmount = currentMaxBet - playerUpdate.currentBet;
-      const availableToCall = creditMode ? (playerUpdate.stack - creditLimit) : playerUpdate.stack;
+      const floor = creditMode ? creditLimit : 0;
+      const availableToCall = playerUpdate.stack - floor;
       const actualCall = Math.min(callAmount, Math.max(0, availableToCall));
       
       playerUpdate.currentBet += actualCall;
@@ -43,7 +44,7 @@ export function handleAction(
       playerUpdate.stack -= actualCall;
       nextState.pot += actualCall;
 
-      if (playerUpdate.stack <= (creditMode ? creditLimit : 0)) {
+      if (playerUpdate.stack <= floor) {
         playerUpdate.isAllIn = true;
       }
       break;
@@ -51,14 +52,14 @@ export function handleAction(
     case 'RAISE':
       if (!action.amount) throw new Error('Raise amount required');
       const requestedRaise = action.amount;
-      const availableToRaise = creditMode ? (playerUpdate.stack - creditLimit) : playerUpdate.stack;
+      const raiseFloor = creditMode ? creditLimit : 0;
+      const availableToRaise = playerUpdate.stack - raiseFloor;
       
       // If requested raise exceeds stack, go all-in
       const actualRaise = Math.min(requestedRaise, playerUpdate.currentBet + availableToRaise);
       const raiseRequired = actualRaise - playerUpdate.currentBet;
       
       if (actualRaise <= currentMaxBet && availableToRaise > 0) {
-        // This case is actually a CALL if the stack allows it, but let's be strict
         throw new Error(`Raise must be greater than current bet. Actual raise: ${actualRaise}, Current max bet: ${currentMaxBet}`);
       }
       
@@ -68,13 +69,13 @@ export function handleAction(
       playerUpdate.stack -= raiseRequired;
       nextState.pot += raiseRequired;
 
-      if (playerUpdate.stack <= (creditMode ? creditLimit : 0)) {
+      if (playerUpdate.stack <= raiseFloor) {
         playerUpdate.isAllIn = true;
       }
       
       // All other non-folded players must act again if they have chips and aren't all-in
       nextState.players.forEach((p, i) => {
-        if (i !== state.activePlayerIndex && !p.isFolded && !p.isAllIn && p.stack > (creditMode ? creditLimit : 0)) {
+        if (i !== state.activePlayerIndex && !p.isFolded && !p.isAllIn && (p.stack > (creditMode ? creditLimit : 0))) {
           p.hasActed = false;
         }
       });

@@ -53,7 +53,7 @@ export class PokerGame {
   }
 
   initializeGame(
-    playerData: { id: string, name: string, isEmpty?: boolean, difficulty?: string, initialStack?: number, thresholdType?: string }[], 
+    playerData: { id: string, name: string, isEmpty?: boolean, difficulty?: string, initialStack?: number, thresholdType?: string, handsNegative?: number }[], 
     creditMode: boolean = false, 
     creditLimit: number = -2000,
     dealerIndex: number = 0,
@@ -134,6 +134,7 @@ export class PokerGame {
         name: p.name,
         stack,
         difficulty: p.difficulty,
+        handsNegative: p.handsNegative,
         initialStack: p.initialStack,
         thresholdType: p.thresholdType as any,
         holeCards: this.deck.draw(2),

@@ -71,6 +71,7 @@ export interface Player {
   position?: Position;
   difficulty?: string; // For bot quit logic
   isEmpty?: boolean;
+  handsNegative?: number; // Count hands spent in negative balance
   initialStack?: number;
   thresholdType?: 'broke' | 'target_1k' | 'profit_200';
 }
