@@ -1,4 +1,25 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# GTO Teacher
+
+A tavern-themed poker trainer to practice decision-making with bots, coaching feedback, and local-first stats.
+
+Main route: **/play** (open http://localhost:3000/play)
+
+## Features
+- Play hands vs bots with a full action flow (fold, check, call, raise) and street progression
+- Hand evaluation + showdown settlement
+- Coaching feedback per hand (action quality + common leaks)
+- Local-first stats and bankroll persistence
+
+## Tech stack
+- Next.js (App Router)
+- TypeScript
+- Deployed on Vercel
+
+## Getting Started
+
+Install dependencies:
+```bash
+npm install
 
 ## Getting Started
 
